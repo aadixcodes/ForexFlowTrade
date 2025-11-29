@@ -40,7 +40,7 @@ export default function Contact() {
             <div className="hidden lg:flex flex-col">
               <div className="rounded-xl overflow-hidden shadow-2xl transform hover:scale-[1.02] transition-transform duration-300">
                 <iframe
-                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2483.289167583456!2d-0.1276509!3d51.5073509!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x487604ce3941eb1f%3A0x1a5342fdf089c627!2sTrafalgar%20Square!5e0!3m2!1sen!2suk!4v1650000000000!5m2!1sen!2suk"
+                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d9348.806334483925!2d57.479024445997744!3d-20.241328758585013!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x217c5bb8ea4aa801%3A0x4794cd25f705cd6c!2sNEX%20Tower!5e1!3m2!1sen!2sin!4v1763975156061!5m2!1sen!2sin"
                   width="100%"
                   height="520"
                   style={{ border: 0 }}
@@ -91,7 +91,7 @@ export default function Contact() {
                 <div className="mt-6 space-y-3">
                   <div className="flex items-center  rounded-lg hover:bg-white/10 transition-colors">
                     <Phone className="h-4 w-4 text-[#43b852] mr-3" />
-                    <span className="text-black text-sm">+1 (555) 123-4567</span>
+                    <span className="text-black text-sm">409-748-1384</span>
                   </div>
                   <div className="flex items-center rounded-lg hover:bg-white/10 transition-colors">
                     <Mail className="h-4 w-4 text-[#43b852] mr-3" />

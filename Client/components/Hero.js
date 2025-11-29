@@ -149,7 +149,7 @@ export default function Hero() {
       {/* Left side glass boxes - desktop only */}
       <div className="hidden lg:flex flex-col space-y-6 absolute left-8 xl:left-16 top-1/2 transform -translate-y-1/2">
         <div className="glass-box group">
-          <p className="text-3xl font-bold text-black">23M+</p>
+          <p className="text-3xl font-bold text-black">5M+</p>
           <p className="text-base text-black/80">Users</p>
           <div className="glass-box-hover-effect" />
         </div>
@@ -164,10 +164,10 @@ export default function Hero() {
       <div className="relative z-10 text-center px-4 sm:px-6 lg:px-8 w-full">
         <div className="md:mb-0">
           <p className="text-sm sm:text-base md:text-lg text-black/90 mb-4 animate-fade-in">
-            Trusted by over <span className='bg-[#43b852] pl-[7px]  text-black rounded-full'> 15 Million </span> Traders
+            Trusted by over <span className='bg-[#43b852] pl-[7px]  text-black rounded-full'> 5 Million </span> Traders
           </p>
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-black mb-6">
-            The Most Awarded Broker<br />for a <span className='text-black'>Reason</span>
+            The Most Trusted Broker<br />for a <span className='text-black'>Reason</span>
           </h1>
           <p className="text-lg sm:text-xl md:text-2xl text-black/90 mb-8 max-w-2xl mx-auto">
             We offer a superior trading environment that puts traders in the best position to profit.
@@ -180,7 +180,7 @@ export default function Hero() {
         {/* Mobile version - boxes below button */}
         <div className="lg:hidden w-full flex justify-center space-x-4 mt-6">
           <div className="glass-box-mobile">
-            <p className="text-lg font-bold text-black">23M+</p>
+            <p className="text-lg font-bold text-black">5M+</p>
             <p className="text-xs text-black/80">Users</p>
           </div>
           <div className="glass-box-mobile">
@@ -188,7 +188,7 @@ export default function Hero() {
             <p className="text-xs text-black/80">Awards</p>
           </div>
           <div className="glass-box-mobile">
-            <p className="text-lg font-bold text-black">21K+</p>
+            <p className="text-lg font-bold text-black">1M+</p>
             <p className="text-xs text-black/80">Investors</p>
           </div>
           <div className="glass-box-mobile">
@@ -202,7 +202,7 @@ export default function Hero() {
       {/* Right side glass boxes - desktop only */}
       <div className="hidden lg:flex flex-col space-y-6 absolute right-8 xl:right-16 top-1/2 transform -translate-y-1/2">
         <div className="glass-box group">
-          <p className="text-3xl font-bold text-black">21K+</p>
+          <p className="text-3xl font-bold text-black">1M+</p>
           <p className="text-base text-black/80">Investors</p>
           <div className="glass-box-hover-effect" />
         </div>

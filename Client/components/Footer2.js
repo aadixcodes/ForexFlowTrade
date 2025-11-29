@@ -1,4 +1,4 @@
-// 'use client';
+//  'use client';
 
 // import React from "react";
 // import { usePathname } from 'next/navigation';
@@ -51,8 +51,6 @@
 
 // export default Footer2;
 
-
-
 'use client';
 
 import React from "react";
@@ -75,18 +73,19 @@ const Footer2 = () => {
         <div className="flex flex-col items-center py-10 px-6">
           {/* Logo and site name */}
           <div className="flex items-center gap-4 mb-4">
-            {/* Placeholder logo icon */}
-            <div className="bg-white/10 rounded-full p-4 flex items-center justify-center">
-              <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="24" cy="24" r="22" stroke="#43B852" strokeWidth="4" fill="none" />
-                <path d="M16 24h16M24 16v16" stroke="#43B852" strokeWidth="3" strokeLinecap="round" />
-              </svg>
+            {/* Logo image */}
+            <div className="p-4 flex items-center justify-center">
+              <img 
+                src="/assets/forexlogo3.png" 
+                alt="ForexFlow Logo" 
+                className="h-14 object-contain"
+              />
             </div>
-            <span className="text-2xl font-bold tracking-wide">ForexFlow</span>
+            {/* <span className="text-2xl font-bold tracking-wide">ForexFlow</span> */}
           </div>
 
           {/* Disclaimer text */}
-          <p className="text-center text-sm md:text-md italic text-gray-200 max-w-5xl mb-6">
+          <p className="text-center text-xs italic text-white/50 max-w-5xl mb-6">
             Investment is risky. You should not spend more than you can afford to lose and should ensure that you fully understand the risks involved. Using the products offered may not be suitable for everyone. Before you use these products, please take into consideration your level of experience, financial objectives and seek independent advice if necessary. It is the responsibility of the Client to ascertain whether he/she is permitted to use the services of the ForexFlow brand based on the legal requirements in his/her country of residence. Client must be aware that profits are on market risk and thus firm does not commits assures or guarantees about the returns and profits.
             <br/> <br/> Investments in securities are subject to market risks, which includes price fluctuation risk. There is no assurance or guarantee that the objectives of any of the products mentioned in this document or on this site will be achieved.
           </p>
@@ -98,13 +97,6 @@ const Footer2 = () => {
               <span className="font-semibold">Phone:</span> 409-748-1384<br />
               <span className="font-semibold">Email:</span> support@forexflow.com
             </div>
-          </div>
-
-          {/* Social icons */}
-          <div className="flex gap-3 justify-center mb-4">
-            <a href="https://api.whatsapp.com/send?phone=7880055659&text=Hello!%20I%20want%20to%20know%20about...%20" target="_blank" className="bg-[#19273A] hover:bg-[#43B852] text-white p-2 rounded transition-colors" aria-label="Twitter"><FaWhatsapp /></a>
-            <a href="#" target="_blank" className="bg-[#19273A] hover:bg-[#43B852] text-white p-2 rounded transition-colors" aria-label="Facebook"><MdOutlineMailOutline /></a>
-            <a href="#" target="_blank" className="bg-[#19273A] hover:bg-[#43B852] text-white p-2 rounded transition-colors" aria-label="Instagram"><FaInstagram /></a>
           </div>
         </div>
       </div>

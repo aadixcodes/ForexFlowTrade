@@ -1,120 +1,3 @@
-// 'use client';
-
-// import { useState, useEffect } from 'react';
-// import { usePathname } from 'next/navigation';
-// import { Menu, X, TrendingUp } from 'lucide-react';
-// import Link from 'next/link';
-
-// export default function Navbar() {
-//   const [isOpen, setIsOpen] = useState(false);
-//   const [scrolled, setScrolled] = useState(false);
-//   const pathname = usePathname();
-
-//   // Don't show navbar on admin routes
-//   const isAdminRoute = pathname.startsWith('/admin');
-//   const isUserRoute = pathname.startsWith('/dashboard');
-
-//   if (isAdminRoute) return null;
-//   if (isUserRoute) return null;
-
-//   const isHome = pathname === '/';
-
-//   useEffect(() => {
-//     if (!isHome) return;
-
-//     const handleScroll = () => {
-//       setScrolled(window.scrollY > 10);
-//     };
-
-//     window.addEventListener('scroll', handleScroll);
-//     return () => window.removeEventListener('scroll', handleScroll);
-//   }, [isHome]);
-
-//   // Determine styles based on page and scroll
-//   const bgClass = isHome
-//     ? scrolled
-//       ? 'bg-white/90 backdrop-blur-md shadow-md'
-//       : 'bg-transparent'
-//     : 'bg-white shadow-md';
-
-//   const textClass = isHome
-//     ? scrolled
-//       ? 'text-[#0e1f1b]'
-//       : 'text-white'
-//     : 'text-[#0e1f1b]';
-
-//   return (
-//     <nav className={`fixed w-full z-50 transition-all duration-300 ${bgClass}`}>
-//       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-//         <div className="flex justify-between items-center h-16">
-//           <div className="flex items-center">
-//             <Link href="/" className="flex items-center space-x-2">
-//               <TrendingUp className={`h-8 w-8 ${textClass}`} />
-//               <span className={`font-bold text-xl ${textClass}`}>
-//                 ForexFlow
-//               </span>
-//             </Link>
-//           </div>
-
-//           <div className="hidden md:flex items-center space-x-8">
-//             <Link href="/" className={`${textClass} hover:text-[#43b852] transition-colors`}>
-//               Home
-//             </Link>
-//             <Link href="/about" className={`${textClass} hover:text-[#43b852] transition-colors`}>
-//               About Us
-//             </Link>
-//             <Link href="/risk" className={`${textClass} hover:text-[#43b852] transition-colors`}>
-//               Risk Warning
-//             </Link>
-//             <Link href="/terms" className={`${textClass} hover:text-[#43b852] transition-colors`}>
-//               Terms & Conditions
-//             </Link>
-//             <Link
-//               href="/kyc-registration"
-//               className="bg-[#43b852] text-white px-6 py-2 rounded-full hover:bg-[#0e1f1b] transition-colors"
-//             >
-//               Register
-//             </Link>
-//           </div>
-
-//           <div className="md:hidden">
-//             <button onClick={() => setIsOpen(!isOpen)} className={`${textClass}`}>
-//               {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-//             </button>
-//           </div>
-//         </div>
-
-//         {isOpen && (
-//           <div className="md:hidden bg-white">
-//             <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-//               <Link href="/" className="block px-3 py-2 text-[#0e1f1b] hover:text-[#43b852]">
-//                 Home
-//               </Link>
-//               <Link href="/about" className="block px-3 py-2 text-[#0e1f1b] hover:text-[#43b852]">
-//                 About Us
-//               </Link>
-//               <Link href="/risk" className="block px-3 py-2 text-[#0e1f1b] hover:text-[#43b852]">
-//                 Risk Warning
-//               </Link>
-//               <Link href="/terms" className="block px-3 py-2 text-[#0e1f1b] hover:text-[#43b852]">
-//                 Terms & Conditions
-//               </Link>
-//               <Link
-//                 href="/kyc-registration"
-//                 className="block text-center w-full mt-4 bg-[#43b852] text-white px-6 py-2 rounded-full hover:bg-[#0e1f1b] transition-colors"
-//               >
-//                 Register
-//               </Link>
-//             </div>
-//           </div>
-//         )}
-//       </div>
-//     </nav>
-//   );
-// }
-
-
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -194,14 +77,14 @@ export default function Navbar() {
   const mobileBg = isHome
     ? scrolled
       ? 'bg-white/95 backdrop-blur-md'
-      : 'bg-black/80 backdrop-blur-md'
+      : 'bg-white/40 backdrop-blur-md'
     : 'bg-white/95 backdrop-blur-md';
 
   // Mobile menu text color based on navbar state
   const mobileTextClass = isHome
     ? scrolled
       ? 'text-[#0e1f1b]'
-      : 'text-white'
+      : 'text-black'
     : 'text-[#0e1f1b]';
 
   return (
@@ -211,10 +94,12 @@ export default function Navbar() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
               <Link href="/" className="flex items-center space-x-2" onClick={handleLinkClick}>
-                <TrendingUp className={`h-8 w-8 ${textClass}`} />
-                <span className={`font-bold text-xl ${textClass}`}>
-                  ForexFlow
-                </span>
+                {/* Replace this image src with your actual logo path */}
+                <img 
+                  src="/assets/forexlogo2.png" 
+                  alt="ForexFlow Logo" 
+                  className="h-10 md:h-12 w-auto"
+                />
               </Link>
             </div>
 
@@ -248,7 +133,7 @@ export default function Navbar() {
                 className={`${textClass} z-60 relative`}
                 aria-label="Toggle navigation menu"
               >
-                {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+                {isOpen ? <X className="h-6 w-6 text-black" /> : <Menu className="h-6 w-6" />}
               </button>
             </div>
           </div>

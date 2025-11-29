@@ -445,7 +445,6 @@ import Link from 'next/link';
 import StatusBadge from '../../components/ui/StatusBadge';
 import { Skeleton } from '@/components/ui/skeleton';
 import UserDetailsPopup from '@/components/UserDetailsPopup';
-import { mockUserDetails } from '@/utils/mockUserData';
 import api from '@/utils/axios';
 
 // API Service for Dashboard
@@ -491,6 +490,16 @@ const dashboardApi = {
     } catch (error) {
       throw new Error(error.response?.data?.message || 'Failed to update deposit status');
     }
+  },
+
+  // Fetch user details by ID
+  getUserById: async (userId) => {
+    try {
+      const response = await api.get(`/admin/get-user/${userId}`);
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to fetch user details');
+    }
   }
 };
 
@@ -531,8 +540,15 @@ const Dashboard = () => {
         });
 
         setMainStats(statsWithIcons);
-        setRecentWithdrawals(recentWithdrawals);
-        setRecentDeposits(recentDeposits);
+        // Ensure arrays are set even if empty
+        setRecentWithdrawals(recentWithdrawals || []);
+        setRecentDeposits(recentDeposits || []);
+        
+        // Log for debugging
+        console.log('Dashboard data loaded:', {
+          withdrawalsCount: recentWithdrawals?.length || 0,
+          depositsCount: recentDeposits?.length || 0
+        });
       }
     } catch (err) {
       console.error('Dashboard fetch error:', err);
@@ -599,15 +615,61 @@ const Dashboard = () => {
   // Handle withdrawal actions - Updated to use same logic as WithdrawRequest
   const handleWithdrawalAction = async (id, action) => {
     if (action === 'view') {
-      const withdrawal = recentWithdrawals.find(w => w.id === id);
-      const user = {
-        name: withdrawal?.user,
-        email: withdrawal?.userEmail,
-        phone: withdrawal?.userPhone,
-        ...mockUserDetails
-      };
-      setSelectedUser(user);
-      setShowUserDetails(true);
+      try {
+        const withdrawal = recentWithdrawals.find(w => w.id === id);
+        if (!withdrawal?.userId) {
+          addToast('error', 'User ID not found');
+          return;
+        }
+
+        // Fetch real user details from API
+        const response = await dashboardApi.getUserById(withdrawal.userId);
+        
+        if (response.status === 'success' && response.data) {
+          const userData = response.data;
+          const balanceInfo = userData.balanceInfo || {};
+          
+          // Format user data to match UserDetailsPopup component structure
+          const formattedUser = {
+            name: userData.name || withdrawal.user,
+            personalInfo: {
+              name: userData.name || withdrawal.user,
+              email: userData.email || withdrawal.userEmail,
+              phone: userData.phone || withdrawal.userPhone,
+              profileImage: userData.userPhoto || ''
+            },
+            kycInfo: {
+              aadharNumber: userData.aadharNo || 'N/A',
+              panNumber: userData.pan || 'N/A',
+              aadharPhoto: userData.aadharPhoto || '',
+              panPhoto: userData.panPhoto || ''
+            },
+            bankDetails: {
+              bankName: userData.bankName || 'N/A',
+              accountHolderName: userData.accountHolder || 'N/A',
+              accountNumber: userData.accountNumber || 'N/A',
+              ifscCode: userData.ifscCode || 'N/A'
+            },
+            forexAccount: {
+              accountBalance: `$${(balanceInfo.accountBalance || 0).toLocaleString()}`,
+              totalDeposit: `$${(balanceInfo.totalDeposit || 0).toLocaleString()}`,
+              totalWithdrawals: `$${(balanceInfo.totalWithdrawals || 0).toLocaleString()}`,
+              orderInvestment: `$${(balanceInfo.orderInvestment || 0).toLocaleString()}`,
+              profitLoss: balanceInfo.profitLoss >= 0 
+                ? `+$${balanceInfo.profitLoss.toLocaleString()}` 
+                : `-$${Math.abs(balanceInfo.profitLoss).toLocaleString()}`
+            }
+          };
+          
+          setSelectedUser(formattedUser);
+          setShowUserDetails(true);
+        } else {
+          addToast('error', 'Failed to fetch user details');
+        }
+      } catch (error) {
+        console.error('Error fetching user details:', error);
+        addToast('error', `Failed to fetch user details: ${error.message}`);
+      }
       return;
     }
 
@@ -648,15 +710,61 @@ const Dashboard = () => {
   // Handle deposit actions
   const handleDepositAction = async (id, action) => {
     if (action === 'view') {
-      const deposit = recentDeposits.find(d => d.id === id);
-      const user = {
-        name: deposit?.user,
-        email: deposit?.userEmail,
-        phone: deposit?.userPhone,
-        ...mockUserDetails
-      };
-      setSelectedUser(user);
-      setShowUserDetails(true);
+      try {
+        const deposit = recentDeposits.find(d => d.id === id);
+        if (!deposit?.userId) {
+          addToast('error', 'User ID not found');
+          return;
+        }
+
+        // Fetch real user details from API
+        const response = await dashboardApi.getUserById(deposit.userId);
+        
+        if (response.status === 'success' && response.data) {
+          const userData = response.data;
+          const balanceInfo = userData.balanceInfo || {};
+          
+          // Format user data to match UserDetailsPopup component structure
+          const formattedUser = {
+            name: userData.name || deposit.user,
+            personalInfo: {
+              name: userData.name || deposit.user,
+              email: userData.email || deposit.userEmail,
+              phone: userData.phone || deposit.userPhone,
+              profileImage: userData.userPhoto || ''
+            },
+            kycInfo: {
+              aadharNumber: userData.aadharNo || 'N/A',
+              panNumber: userData.pan || 'N/A',
+              aadharPhoto: userData.aadharPhoto || '',
+              panPhoto: userData.panPhoto || ''
+            },
+            bankDetails: {
+              bankName: userData.bankName || 'N/A',
+              accountHolderName: userData.accountHolder || 'N/A',
+              accountNumber: userData.accountNumber || 'N/A',
+              ifscCode: userData.ifscCode || 'N/A'
+            },
+            forexAccount: {
+              accountBalance: `$${(balanceInfo.accountBalance || 0).toLocaleString()}`,
+              totalDeposit: `$${(balanceInfo.totalDeposit || 0).toLocaleString()}`,
+              totalWithdrawals: `$${(balanceInfo.totalWithdrawals || 0).toLocaleString()}`,
+              orderInvestment: `$${(balanceInfo.orderInvestment || 0).toLocaleString()}`,
+              profitLoss: balanceInfo.profitLoss >= 0 
+                ? `+$${balanceInfo.profitLoss.toLocaleString()}` 
+                : `-$${Math.abs(balanceInfo.profitLoss).toLocaleString()}`
+            }
+          };
+          
+          setSelectedUser(formattedUser);
+          setShowUserDetails(true);
+        } else {
+          addToast('error', 'Failed to fetch user details');
+        }
+      } catch (error) {
+        console.error('Error fetching user details:', error);
+        addToast('error', `Failed to fetch user details: ${error.message}`);
+      }
       return;
     }
 
@@ -849,7 +957,7 @@ const Dashboard = () => {
       {/* Recent Withdrawals and Deposits Tables */}
       {!error && !loading && (
         <div className="space-y-6">
-          {/* Recent Withdrawals */}
+          {/* Recent Withdrawals Table */}
           <div className="dark:bg-[#142924] rounded-lg dark:border-[#2A3F3A] border shadow-sm">
             <div className="p-4 border-b dark:border-[#2A3F3A] flex items-center justify-between">
               <div>
@@ -857,52 +965,64 @@ const Dashboard = () => {
                 <p className="text-sm text-gray-500 dark:text-[#ABBAB6]">Latest withdrawal requests</p>
               </div>
               <Link 
-                href="/admin/withdrawals" 
+                href="/admin/withdrawal-request"
                 className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center gap-1"
               >
                 View All <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
-            <div className="p-4">
+            <div className="p-4 overflow-x-auto">
               {recentWithdrawals.length === 0 ? (
                 <WithdrawalEmptyState />
               ) : (
-                <div className="space-y-3">
-                  {recentWithdrawals.slice(0, 5).map((withdrawal) => (
-                    <div key={withdrawal.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-[#1A2F2A] rounded-lg">
-                      <div className="flex-1">
-                        <p className="font-medium dark:text-[#F2F2F2]">{withdrawal.user}</p>
-                        <p className="text-sm text-gray-500 dark:text-[#ABBAB6]">{withdrawal.amount} • {withdrawal.date}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <StatusBadge status={withdrawal.status} />
-                        {withdrawal.status === 'pending' && (
+                <table className="w-full min-w-[600px] text-sm">
+                  <thead>
+                    <tr className="border-b dark:border-[#2A3F3A]">
+                      <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-[#ABBAB6]">User</th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-[#ABBAB6]">Amount</th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-[#ABBAB6]">Date</th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-[#ABBAB6]">Status</th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-[#ABBAB6]">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentWithdrawals.slice(0, 5).map((withdrawal) => (
+                      <tr key={withdrawal.id} className="border-b dark:border-[#2A3F3A] hover:bg-muted/50">
+                        <td className="px-3 py-2 dark:text-[#F2F2F2]">{withdrawal.user}</td>
+                        <td className="px-3 py-2 font-medium dark:text-[#F2F2F2]">{withdrawal.amount}</td>
+                        <td className="px-3 py-2 dark:text-[#F2F2F2]">{withdrawal.date}</td>
+                        <td className="px-3 py-2"><StatusBadge status={withdrawal.status} /></td>
+                        <td className="px-3 py-2">
                           <div className="flex gap-1">
+                            {withdrawal.status === 'pending' && (
+                              <>
+                                <ActionButton
+                                  type="accept"
+                                  onClick={() => handleWithdrawalAction(withdrawal.id, 'accept')}
+                                  loading={actionLoading[withdrawal.id]}
+                                />
+                                <ActionButton
+                                  type="reject"
+                                  onClick={() => handleWithdrawalAction(withdrawal.id, 'reject')}
+                                  loading={actionLoading[withdrawal.id]}
+                                />
+                              </>
+                            )}
                             <ActionButton
-                              type="accept"
-                              onClick={() => handleWithdrawalAction(withdrawal.id, 'accept')}
-                              loading={actionLoading[withdrawal.id]}
-                            />
-                            <ActionButton
-                              type="reject"
-                              onClick={() => handleWithdrawalAction(withdrawal.id, 'reject')}
-                              loading={actionLoading[withdrawal.id]}
+                              type="view"
+                              onClick={() => handleWithdrawalAction(withdrawal.id, 'view')}
                             />
                           </div>
-                        )}
-                        <ActionButton
-                          type="view"
-                          onClick={() => handleWithdrawalAction(withdrawal.id, 'view')}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               )}
             </div>
           </div>
 
-          {/* Recent Deposits */}
+          {/* Recent Deposits Table */}
           <div className="dark:bg-[#142924] rounded-lg dark:border-[#2A3F3A] border shadow-sm">
             <div className="p-4 border-b dark:border-[#2A3F3A] flex items-center justify-between">
               <div>
@@ -910,47 +1030,61 @@ const Dashboard = () => {
                 <p className="text-sm text-gray-500 dark:text-[#ABBAB6]">Latest deposit requests</p>
               </div>
               <Link 
-                href="/admin/deposits" 
+                href="/admin/deposit-request"
                 className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center gap-1"
               >
                 View All <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
-            <div className="p-4">
+            <div className="p-4 overflow-x-auto">
               {recentDeposits.length === 0 ? (
                 <DepositEmptyState />
               ) : (
-                <div className="space-y-3">
-                  {recentDeposits.slice(0, 5).map((deposit) => (
-                    <div key={deposit.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-[#1A2F2A] rounded-lg">
-                      <div className="flex-1">
-                        <p className="font-medium dark:text-[#F2F2F2]">{deposit.user}</p>
-                        <p className="text-sm text-gray-500 dark:text-[#ABBAB6]">{deposit.amount} • {deposit.method} • {deposit.date}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <StatusBadge status={deposit.status} />
-                        {deposit.status === 'pending' && (
+                <table className="w-full min-w-[700px] text-sm">
+                  <thead>
+                    <tr className="border-b dark:border-[#2A3F3A]">
+                      <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-[#ABBAB6]">User</th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-[#ABBAB6]">Amount</th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-[#ABBAB6]">Method</th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-[#ABBAB6]">Date</th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-[#ABBAB6]">Status</th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-500 dark:text-[#ABBAB6]">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentDeposits.slice(0, 5).map((deposit) => (
+                      <tr key={deposit.id} className="border-b dark:border-[#2A3F3A] hover:bg-muted/50">
+                        <td className="px-3 py-2 dark:text-[#F2F2F2]">{deposit.user}</td>
+                        <td className="px-3 py-2 font-medium dark:text-[#F2F2F2]">{deposit.amount}</td>
+                        <td className="px-3 py-2 dark:text-[#F2F2F2]">{deposit.method}</td>
+                        <td className="px-3 py-2 dark:text-[#F2F2F2]">{deposit.date}</td>
+                        <td className="px-3 py-2"><StatusBadge status={deposit.status} /></td>
+                        <td className="px-3 py-2">
                           <div className="flex gap-1">
+                            {deposit.status === 'pending' && (
+                              <>
+                                <ActionButton
+                                  type="accept"
+                                  onClick={() => handleDepositAction(deposit.id, 'accept')}
+                                  loading={actionLoading[deposit.id]}
+                                />
+                                <ActionButton
+                                  type="reject"
+                                  onClick={() => handleDepositAction(deposit.id, 'reject')}
+                                  loading={actionLoading[deposit.id]}
+                                />
+                              </>
+                            )}
                             <ActionButton
-                              type="accept"
-                              onClick={() => handleDepositAction(deposit.id, 'accept')}
-                              loading={actionLoading[deposit.id]}
-                            />
-                            <ActionButton
-                              type="reject"
-                              onClick={() => handleDepositAction(deposit.id, 'reject')}
-                              loading={actionLoading[deposit.id]}
+                              type="view"
+                              onClick={() => handleDepositAction(deposit.id, 'view')}
                             />
                           </div>
-                        )}
-                        <ActionButton
-                          type="view"
-                          onClick={() => handleDepositAction(deposit.id, 'view')}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               )}
             </div>
           </div>

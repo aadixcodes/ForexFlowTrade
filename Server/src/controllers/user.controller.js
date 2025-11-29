@@ -1,6 +1,7 @@
 import User from "../models/user.model.js"
 import bcrypt from "bcrypt"
 import nodemailer from "nodemailer"
+import mongoose from "mongoose"
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import Transaction from "../models/transaction.model.js";
@@ -644,7 +645,7 @@ const getAlluserKpis = async (req, res) => {
                 { 
                     _id: { 
                         $in: await Transaction.distinct('userId', { 
-                            createdAt: { $gte: thirtyDaysAgo } 
+                            timestamp: { $gte: thirtyDaysAgo } 
                         }) 
                     } 
                 }
@@ -653,10 +654,12 @@ const getAlluserKpis = async (req, res) => {
 
         console.log("This is admin dashboard __________________------------------:::::::::")
         // Get pending withdrawals
+
+        // Use correct type values for withdrawals and deposits
         const pendingWithdrawals = await Transaction.aggregate([
             {
                 $match: {
-                    type: 'WITHDRAW',
+                    type: 'WITHDRAWAL',
                     status: 'PENDING'
                 }
             },
@@ -692,23 +695,21 @@ const getAlluserKpis = async (req, res) => {
 
         // Get recent withdrawal requests (last 10) with null check
         const recentWithdrawals = await Transaction.find({
-            type: 'WITHDRAW',
-            status: { $in: ['PENDING', 'COMPLETED', 'REJECTED'] },
-            createdAt: { $exists: true, $ne: null } // Add this filter
+            type: 'WITHDRAWAL',
+            status: { $in: ['PENDING', 'COMPLETED', 'CANCELLED', 'FAILED'] }
         })
         .populate('userId', 'name email phone')
-        .sort({ createdAt: -1 })
+        .sort({ timestamp: -1 })
         .limit(10)
         .lean();
 
         // Get recent deposit requests (last 10) with null check
         const recentDeposits = await Transaction.find({
             type: 'DEPOSIT',
-            status: { $in: ['PENDING', 'COMPLETED', 'REJECTED'] },
-            createdAt: { $exists: true, $ne: null } // Add this filter
+            status: { $in: ['PENDING', 'COMPLETED', 'CANCELLED', 'FAILED'] }
         })
         .populate('userId', 'name email phone')
-        .sort({ createdAt: -1 })
+        .sort({ timestamp: -1 })
         .limit(10)
         .lean();
 
@@ -728,7 +729,7 @@ const getAlluserKpis = async (req, res) => {
                 { 
                     _id: { 
                         $in: await Transaction.distinct('userId', { 
-                            createdAt: { $gte: sixtyDaysAgo, $lt: thirtyDaysAgo } 
+                            timestamp: { $gte: sixtyDaysAgo, $lt: thirtyDaysAgo } 
                         }) 
                     } 
                 }
@@ -739,9 +740,9 @@ const getAlluserKpis = async (req, res) => {
         const previousPendingWithdrawals = await Transaction.aggregate([
             {
                 $match: {
-                    type: 'WITHDRAW',
+                    type: 'WITHDRAWAL',
                     status: 'PENDING',
-                    createdAt: { $gte: sixtyDaysAgo, $lt: thirtyDaysAgo, $exists: true, $ne: null }
+                    timestamp: { $gte: sixtyDaysAgo, $lt: thirtyDaysAgo }
                 }
             },
             {
@@ -760,7 +761,7 @@ const getAlluserKpis = async (req, res) => {
                 $match: {
                     type: 'DEPOSIT',
                     status: 'PENDING',
-                    createdAt: { $gte: sixtyDaysAgo, $lt: thirtyDaysAgo, $exists: true, $ne: null }
+                    timestamp: { $gte: sixtyDaysAgo, $lt: thirtyDaysAgo }
                 }
             },
             {
@@ -808,7 +809,9 @@ const getAlluserKpis = async (req, res) => {
         const safeFormatDate = (date) => {
             if (!date) return new Date().toISOString().split('T')[0];
             try {
-                return new Date(date).toISOString().split('T')[0];
+                // Handle both timestamp and createdAt fields
+                const dateObj = date instanceof Date ? date : new Date(date);
+                return dateObj.toISOString().split('T')[0];
             } catch (error) {
                 return new Date().toISOString().split('T')[0];
             }
@@ -850,32 +853,48 @@ const getAlluserKpis = async (req, res) => {
                     }
                 }
             ],
-            recentWithdrawals: recentWithdrawals.map(withdrawal => ({
-                id: withdrawal._id,
-                user: withdrawal.userId?.name || 'Unknown User',
-                userEmail: withdrawal.userId?.email,
-                userPhone: withdrawal.userId?.phone,
-                amount: `$${(withdrawal.amount || 0).toLocaleString()}`,
-                date: safeFormatDate(withdrawal.createdAt),
-                status: withdrawal.status ? withdrawal.status.toLowerCase() : 'unknown',
-                rawAmount: withdrawal.amount || 0,
-                rawDate: withdrawal.createdAt || new Date(),
-                paymentMethod: getPaymentMethodDisplay(withdrawal.paymentMethod),
-                transactionId: withdrawal.transactionId || withdrawal._id
-            })),
-            recentDeposits: recentDeposits.map(deposit => ({
-                id: deposit._id,
-                user: deposit.userId?.name || 'Unknown User',
-                userEmail: deposit.userId?.email,
-                userPhone: deposit.userId?.phone,
-                amount: `$${(deposit.amount || 0).toLocaleString()}`,
-                method: getPaymentMethodDisplay(deposit.paymentMethod),
-                date: safeFormatDate(deposit.createdAt),
-                status: deposit.status ? deposit.status.toLowerCase() : 'unknown',
-                rawAmount: deposit.amount || 0,
-                rawDate: deposit.createdAt || new Date(),
-                transactionId: deposit.transactionId || deposit._id
-            }))
+            recentWithdrawals: recentWithdrawals.map(withdrawal => {
+                // Map status to frontend-compatible values
+                let status = withdrawal.status ? withdrawal.status.toLowerCase() : 'unknown';
+                if (status === 'cancelled') status = 'rejected';
+                if (status === 'failed') status = 'rejected';
+                
+                return {
+                    id: withdrawal._id,
+                    userId: withdrawal.userId?._id || withdrawal.userId, // Include userId for fetching details
+                    user: withdrawal.userId?.name || 'Unknown User',
+                    userEmail: withdrawal.userId?.email,
+                    userPhone: withdrawal.userId?.phone,
+                    amount: `$${(withdrawal.amount || 0).toLocaleString()}`,
+                    date: safeFormatDate(withdrawal.timestamp || withdrawal.createdAt),
+                    status: status,
+                    rawAmount: withdrawal.amount || 0,
+                    rawDate: withdrawal.timestamp || withdrawal.createdAt || new Date(),
+                    paymentMethod: getPaymentMethodDisplay(withdrawal.paymentMethod),
+                    transactionId: withdrawal.transactionId || withdrawal._id
+                };
+            }),
+            recentDeposits: recentDeposits.map(deposit => {
+                // Map status to frontend-compatible values
+                let status = deposit.status ? deposit.status.toLowerCase() : 'unknown';
+                if (status === 'cancelled') status = 'rejected';
+                if (status === 'failed') status = 'rejected';
+                
+                return {
+                    id: deposit._id,
+                    userId: deposit.userId?._id || deposit.userId, // Include userId for fetching details
+                    user: deposit.userId?.name || 'Unknown User',
+                    userEmail: deposit.userId?.email,
+                    userPhone: deposit.userId?.phone,
+                    amount: `$${(deposit.amount || 0).toLocaleString()}`,
+                    method: getPaymentMethodDisplay(deposit.paymentMethod),
+                    date: safeFormatDate(deposit.timestamp || deposit.createdAt),
+                    status: status,
+                    rawAmount: deposit.amount || 0,
+                    rawDate: deposit.timestamp || deposit.createdAt || new Date(),
+                    transactionId: deposit.transactionId || deposit._id
+                };
+            })
         };
 
         res.status(200).json({
@@ -1296,7 +1315,7 @@ const getUserbyId = async (req, res) => {
     }
 
     try {
-        const user = await User.findById(userId).select('name email phone aadharNo pan bankName accountNumber accountHolder ifscCode isVerified createdAt updatedAt');
+        const user = await User.findById(userId).select('name email phone aadharNo pan bankName accountNumber accountHolder ifscCode isVerified createdAt updatedAt aadharPhoto panPhoto userPhoto');
         if (!user) {
             return res.status(404).json({
                 status: "fail",
@@ -1304,10 +1323,51 @@ const getUserbyId = async (req, res) => {
             });
         }
 
+        // Get user balance information
+        let balanceInfo = {
+            accountBalance: 0,
+            totalDeposit: 0,
+            totalWithdrawals: 0,
+            orderInvestment: 0,
+            profitLoss: 0
+        };
+
+        try {
+            const balanceData = await User.getUserBalances(userId);
+            if (balanceData) {
+                balanceInfo.accountBalance = balanceData.totalBalance || 0;
+                balanceInfo.totalDeposit = balanceData.totalDeposited || 0;
+                balanceInfo.totalWithdrawals = balanceData.totalWithdrawn || 0;
+            }
+
+            // Get order investment and profit/loss from OrderHistory
+            const orderStats = await OrderHistory.aggregate([
+                { $match: { userId: new mongoose.Types.ObjectId(userId) } },
+                {
+                    $group: {
+                        _id: null,
+                        totalInvestment: { $sum: '$tradeAmount' },
+                        totalProfitLoss: { $sum: '$profitLoss' }
+                    }
+                }
+            ]);
+
+            if (orderStats.length > 0) {
+                balanceInfo.orderInvestment = orderStats[0].totalInvestment || 0;
+                balanceInfo.profitLoss = orderStats[0].totalProfitLoss || 0;
+            }
+        } catch (balanceError) {
+            console.error('Error fetching balance info:', balanceError);
+            // Continue without balance info if it fails
+        }
+
         res.status(200).json({
             status: "success",
             message: "User retrieved successfully",
-            data: user
+            data: {
+                ...user.toObject(),
+                balanceInfo
+            }
         });
     } catch (error) {
         console.error('Error fetching user:', error);

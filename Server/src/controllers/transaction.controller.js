@@ -830,7 +830,8 @@ const getAllPendingWithdrawals = asyncHandler(async (req, res) => {
       new ApiResponse(200,{ totalPending, withdrawals }, "All pending withdrawals retrieved successfully")
     );
   } catch (error) {
-    throw new ApiError(500, "Failed to retrieve all pending withdrawals");
+    console.error('getAllPendingWithdrawals error:', error.message, error.stack);
+    throw new ApiError(500, `Failed to retrieve all pending withdrawals: ${error.message}`);
   }
 });
 
@@ -887,8 +888,7 @@ const getVerifiedWithdrawalById = asyncHandler(async (req, res) => {
 });
 
 const approveWithdrawal = asyncHandler(async (req, res) => {
-  const { id } = req.body; // Get ID from request body instead of params
-  
+  const { id } = req.params; // Get ID from URL params
   try {
     const withdrawal = await Transaction.findOneAndUpdate(
       { _id: id, type: 'WITHDRAWAL', status: 'PENDING' },
@@ -909,8 +909,7 @@ const approveWithdrawal = asyncHandler(async (req, res) => {
 });
 
 const rejectWithdrawal = asyncHandler(async (req, res) => {
-  const { id } = req.body; // Get ID from request body instead of params
-  
+  const { id } = req.params; // Get ID from URL params
   try {
     const withdrawal = await Transaction.findOneAndUpdate(
       { _id: id, type: 'WITHDRAWAL', status: 'PENDING' },
