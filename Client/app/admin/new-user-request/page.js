@@ -96,15 +96,16 @@ const NewUserRequest = () => {
 
         setUserRequests(transformedUsers);
 
-        // Calculate stats from actual data
+        // Calculate stats from actual data - ensure no negative values
+        // Handle undefined/null values properly
         const totalUsers = users.length;
-        const verifiedUsers = users.filter(user => user.isVerified).length;
-        const pendingUsers = users.filter(user => !user.isVerified).length;
+        const verifiedUsers = users.filter(user => user.isVerified === true || user.isVerified === 'true').length;
+        const pendingUsers = users.filter(user => user.isVerified === false || user.isVerified === null || user.isVerified === undefined).length;
 
         setStats([
-          { title: 'Total Users', value: totalUsers.toString(), icon: Users },
-          { title: 'Pending Verifications', value: pendingUsers.toString(), icon: Clock },
-          { title: 'Verified Users', value: verifiedUsers.toString(), icon: UserCheck },
+          { title: 'Total Users', value: Math.max(0, totalUsers).toString(), icon: Users },
+          { title: 'Pending Verifications', value: Math.max(0, pendingUsers).toString(), icon: Clock },
+          { title: 'Verified Users', value: Math.max(0, verifiedUsers).toString(), icon: UserCheck },
         ]);
 
         setApiError(null);
@@ -128,37 +129,25 @@ const NewUserRequest = () => {
 
       if (response.data.status === 'success') {
         // Update local state
-        setUserRequests(prev =>
-          prev.map(user =>
+        setUserRequests(prev => {
+          const updated = prev.map(user =>
             user.id === userId 
               ? { ...user, status: action === 'accept' ? 'verified' : 'pending' } 
               : user
-          )
-        );
-
-        // Update stats
-        setStats(prevStats => {
-          const newStats = [...prevStats];
-          const pendingIndex = newStats.findIndex(stat => stat.title === 'Pending Verifications');
-          const verifiedIndex = newStats.findIndex(stat => stat.title === 'Verified Users');
+          );
           
-          if (action === 'accept') {
-            if (pendingIndex !== -1) {
-              newStats[pendingIndex].value = (parseInt(newStats[pendingIndex].value) - 1).toString();
-            }
-            if (verifiedIndex !== -1) {
-              newStats[verifiedIndex].value = (parseInt(newStats[verifiedIndex].value) + 1).toString();
-            }
-          } else {
-            if (pendingIndex !== -1) {
-              newStats[pendingIndex].value = (parseInt(newStats[pendingIndex].value) + 1).toString();
-            }
-            if (verifiedIndex !== -1) {
-              newStats[verifiedIndex].value = (parseInt(newStats[verifiedIndex].value) - 1).toString();
-            }
-          }
+          // Recalculate stats from actual data to ensure accuracy
+          const totalUsers = updated.length;
+          const verifiedUsers = updated.filter(user => user.status === 'verified').length;
+          const pendingUsers = updated.filter(user => user.status === 'pending').length;
           
-          return newStats;
+          setStats([
+            { title: 'Total Users', value: Math.max(0, totalUsers).toString(), icon: Users },
+            { title: 'Pending Verifications', value: Math.max(0, pendingUsers).toString(), icon: Clock },
+            { title: 'Verified Users', value: Math.max(0, verifiedUsers).toString(), icon: UserCheck },
+          ]);
+          
+          return updated;
         });
 
         addToast(
@@ -185,18 +174,55 @@ const NewUserRequest = () => {
         const userData = response.data.data;
         const userFromList = userRequests.find(u => u.id === userId);
         
+        // Structure data to match UserDetailsPopup component expectations
         setSelectedUser({
           name: userData.name || 'Unknown User',
-          email: userData.email || 'No email provided',
-          phone: userData.phone || 'No phone provided',
-          aadharNo: userData.aadharNo || 'Not provided',
-          pan: userData.pan || 'Not provided',
-          bankName: userData.bankName || 'Not provided',
-          accountNumber: userData.accountNumber || 'Not provided',
-          accountHolder: userData.accountHolder || 'Not provided',
-          ifscCode: userData.ifscCode || 'Not provided',
+          personalInfo: {
+            name: userData.name || 'Unknown User',
+            email: userData.email || 'No email provided',
+            phone: userData.phone || 'No phone provided',
+            profileImage: userData.userPhoto || '/default-avatar.png'
+          },
+          kycInfo: {
+            aadharNumber: userData.aadharNo || 'Not provided',
+            panNumber: userData.pan || 'Not provided',
+            aadharPhoto: userData.aadharPhoto || '',
+            panPhoto: userData.panPhoto || '',
+            profilePhoto: userData.userPhoto || ''
+          },
+          bankDetails: {
+            bankName: userData.bankName || 'Not provided',
+            accountHolderName: userData.accountHolder || 'Not provided',
+            accountNumber: userData.accountNumber || 'Not provided',
+            ifscCode: userData.ifscCode || 'Not provided'
+          },
+          forexAccount: {
+            accountBalance: (userData.balanceInfo?.accountBalance !== undefined && userData.balanceInfo?.accountBalance !== null)
+              ? `$${Number(userData.balanceInfo.accountBalance).toLocaleString()}` 
+              : '$0',
+            totalDeposit: (userData.balanceInfo?.totalDeposit !== undefined && userData.balanceInfo?.totalDeposit !== null)
+              ? `$${Number(userData.balanceInfo.totalDeposit).toLocaleString()}` 
+              : '$0',
+            totalWithdrawals: (userData.balanceInfo?.totalWithdrawals !== undefined && userData.balanceInfo?.totalWithdrawals !== null)
+              ? `$${Number(userData.balanceInfo.totalWithdrawals).toLocaleString()}` 
+              : '$0',
+            orderInvestment: (userData.balanceInfo?.orderInvestment !== undefined && userData.balanceInfo?.orderInvestment !== null)
+              ? `$${Number(userData.balanceInfo.orderInvestment).toLocaleString()}` 
+              : '$0',
+            profitLoss: (userData.balanceInfo?.profitLoss !== undefined && userData.balanceInfo?.profitLoss !== null)
+              ? (Number(userData.balanceInfo.profitLoss) >= 0 
+                  ? `+$${Number(userData.balanceInfo.profitLoss).toLocaleString()}` 
+                  : `-$${Math.abs(Number(userData.balanceInfo.profitLoss)).toLocaleString()}`)
+              : '$0'
+          },
           isVerified: userData.isVerified,
-          joinedDate: userFromList?.joinedDate || 'Unknown',
+          joinedDate: userFromList?.joinedDate || userData.createdAt 
+            ? new Date(userData.createdAt).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+              })
+            : 'Unknown',
           status: userData.isVerified ? 'verified' : 'pending'
         });
         setShowUserDetails(true);
@@ -205,7 +231,7 @@ const NewUserRequest = () => {
       }
     } catch (error) {
       console.error('Error fetching user details:', error);
-      addToast('error', 'Failed to load user details');
+      addToast('error', error.response?.data?.message || 'Failed to load user details');
     }
   };
 
@@ -221,17 +247,22 @@ const NewUserRequest = () => {
       });
 
       if (response.data.status === 'success') {
-        // Remove user from local state
-        setUserRequests(prev => prev.filter(user => user.id !== userId));
-        
-        // Update stats
-        setStats(prevStats => {
-          const newStats = [...prevStats];
-          const totalIndex = newStats.findIndex(stat => stat.title === 'Total Users');
-          if (totalIndex !== -1) {
-            newStats[totalIndex].value = (parseInt(newStats[totalIndex].value) - 1).toString();
-          }
-          return newStats;
+        // Remove user from local state and recalculate stats
+        setUserRequests(prev => {
+          const updated = prev.filter(user => user.id !== userId);
+          
+          // Recalculate stats from actual data to ensure accuracy
+          const totalUsers = updated.length;
+          const verifiedUsers = updated.filter(user => user.status === 'verified').length;
+          const pendingUsers = updated.filter(user => user.status === 'pending').length;
+          
+          setStats([
+            { title: 'Total Users', value: Math.max(0, totalUsers).toString(), icon: Users },
+            { title: 'Pending Verifications', value: Math.max(0, pendingUsers).toString(), icon: Clock },
+            { title: 'Verified Users', value: Math.max(0, verifiedUsers).toString(), icon: UserCheck },
+          ]);
+          
+          return updated;
         });
 
         addToast('success', 'User deleted successfully');

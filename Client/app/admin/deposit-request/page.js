@@ -147,22 +147,48 @@ const DepositeRequest = () => {
 
   // Transform backend data to frontend format
   const transformDepositData = (deposits) => {
-    return deposits.map(deposit => ({
-      id: deposit._id,
-      transactionId: deposit.transactionId,
-      user: deposit.userId?.name || 'Unknown User',
-      userEmail: deposit.userId?.email || '',
-      userPhone: deposit.userId?.phone || '',
-      amount: formatAmount(deposit.amount, deposit.currency),
-      date: formatDate(deposit.timestamp),
-      method: formatPaymentMethod(deposit.paymentMethod),
-      status: mapStatus(deposit.status),
-      rawAmount: deposit.amount,
-      currency: deposit.currency,
-      description: deposit.description,
-      failureReason: deposit.failureReason,
-      verified: deposit.verified
-    }));
+    return deposits.map(deposit => {
+      // Extract userId - handle both populated (object) and non-populated (string/ObjectId) cases
+      let userId = null;
+      if (deposit.userId) {
+        if (typeof deposit.userId === 'object' && deposit.userId._id) {
+          // Populated user object
+          userId = deposit.userId._id.toString ? deposit.userId._id.toString() : String(deposit.userId._id);
+        } else if (typeof deposit.userId === 'string') {
+          // String ID
+          userId = deposit.userId;
+        } else if (deposit.userId.toString) {
+          // ObjectId or other object with toString method
+          userId = deposit.userId.toString();
+        } else {
+          // Fallback: convert to string
+          userId = String(deposit.userId);
+        }
+      }
+
+      // Log if userId extraction failed (for debugging)
+      if (!userId && deposit.userId) {
+        console.warn('Failed to extract userId from deposit:', deposit);
+      }
+
+      return {
+        id: deposit._id,
+        transactionId: deposit.transactionId,
+        userId: userId, // Store userId for fetching full details
+        user: deposit.userId?.name || 'Unknown User',
+        userEmail: deposit.userId?.email || '',
+        userPhone: deposit.userId?.phone || '',
+        amount: formatAmount(deposit.amount, deposit.currency),
+        date: formatDate(deposit.timestamp),
+        method: formatPaymentMethod(deposit.paymentMethod),
+        status: mapStatus(deposit.status),
+        rawAmount: deposit.amount,
+        currency: deposit.currency,
+        description: deposit.description,
+        failureReason: deposit.failureReason,
+        verified: deposit.verified
+      };
+    });
   };
 
   const handleDepositAction = async (depositId, action) => {
@@ -199,21 +225,97 @@ const DepositeRequest = () => {
         addToast('error', errorMessage);
       }
     } else if (action === 'view') {
-      const deposit = verifiedDeposits.find(d => d.id === depositId);
+      const deposit = verifiedDeposits.find(d => d.id === depositId) || pendingDeposits.find(d => d.id === depositId);
       if (deposit) {
-        handleViewAction(depositId, deposit.user, deposit.userEmail, deposit.userPhone);
+        if (!deposit.userId) {
+          console.error('Deposit found but userId is missing:', deposit);
+          addToast('error', 'User ID not found in deposit data');
+          return;
+        }
+        handleViewAction(deposit);
+      } else {
+        console.error('Deposit not found with id:', depositId);
+        console.error('Available verified deposits:', verifiedDeposits.map(d => d.id));
+        console.error('Available pending deposits:', pendingDeposits.map(d => d.id));
+        addToast('error', 'Deposit not found');
       }
     }
   };
 
-  const handleViewAction = (depositId, userName, userEmail, userPhone) => {
-    const user = {
-      name: userName,
-      email: userEmail,
-      phone: userPhone,
-    };
-    setSelectedUser(user);
-    setShowUserDetails(true);
+  const handleViewAction = async (deposit) => {
+    try {
+      // Ensure userId is a string - handle all possible formats
+      let userId = null;
+      
+      if (deposit?.userId) {
+        if (typeof deposit.userId === 'string') {
+          userId = deposit.userId;
+        } else if (deposit.userId.toString) {
+          userId = deposit.userId.toString();
+        } else if (deposit.userId._id) {
+          userId = deposit.userId._id.toString ? deposit.userId._id.toString() : deposit.userId._id;
+        } else {
+          userId = String(deposit.userId);
+        }
+      }
+      
+      if (!userId || userId === 'null' || userId === 'undefined') {
+        console.error('Deposit data:', deposit);
+        console.error('Extracted userId:', userId);
+        addToast('error', 'User ID not found');
+        return;
+      }
+
+      console.log('Fetching user details for userId:', userId);
+      // Fetch full user details from API
+      const response = await api.get(`/admin/get-user/${userId}`);
+      
+      if (response.data.status === 'success' && response.data.data) {
+        const userData = response.data.data;
+        const balanceInfo = userData.balanceInfo || {};
+        
+        // Format user data to match UserDetailsPopup component structure
+        const formattedUser = {
+          name: userData.name || deposit.user,
+          personalInfo: {
+            name: userData.name || deposit.user,
+            email: userData.email || deposit.userEmail,
+            phone: userData.phone || deposit.userPhone,
+            profileImage: userData.userPhoto || ''
+          },
+          kycInfo: {
+            aadharNumber: userData.aadharNo || 'N/A',
+            panNumber: userData.pan || 'N/A',
+            aadharPhoto: userData.aadharPhoto || '',
+            panPhoto: userData.panPhoto || ''
+          },
+          bankDetails: {
+            bankName: userData.bankName || 'N/A',
+            accountHolderName: userData.accountHolder || 'N/A',
+            accountNumber: userData.accountNumber || 'N/A',
+            ifscCode: userData.ifscCode || 'N/A'
+          },
+          forexAccount: {
+            accountBalance: `$${(balanceInfo.accountBalance || 0).toLocaleString()}`,
+            totalDeposit: `$${(balanceInfo.totalDeposit || 0).toLocaleString()}`,
+            totalWithdrawals: `$${(balanceInfo.totalWithdrawals || 0).toLocaleString()}`,
+            orderInvestment: `$${(balanceInfo.orderInvestment || 0).toLocaleString()}`,
+            profitLoss: balanceInfo.profitLoss >= 0 
+              ? `+$${balanceInfo.profitLoss.toLocaleString()}` 
+              : `-$${Math.abs(balanceInfo.profitLoss).toLocaleString()}`
+          }
+        };
+        
+        setSelectedUser(formattedUser);
+        setShowUserDetails(true);
+      } else {
+        addToast('error', 'Failed to fetch user details');
+      }
+    } catch (error) {
+      console.error('Error fetching user details:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch user details';
+      addToast('error', errorMessage);
+    }
   };
 
   useEffect(() => {
@@ -226,8 +328,21 @@ const DepositeRequest = () => {
           fetchVerifiedDeposits()
         ]);
         
-        setPendingDeposits(transformDepositData(pendingData));
-        setVerifiedDeposits(transformDepositData(verifiedData));
+        // Debug: Log raw data to see structure
+        if (verifiedData.length > 0) {
+          console.log('Sample verified deposit raw data:', verifiedData[0]);
+        }
+        
+        const transformedPending = transformDepositData(pendingData);
+        const transformedVerified = transformDepositData(verifiedData);
+        
+        // Debug: Log transformed data
+        if (transformedVerified.length > 0) {
+          console.log('Sample verified deposit transformed:', transformedVerified[0]);
+        }
+        
+        setPendingDeposits(transformedPending);
+        setVerifiedDeposits(transformedVerified);
       } catch (error) {
         console.error('Error fetching data:', error);
         addToast('error', 'Failed to load deposit data');

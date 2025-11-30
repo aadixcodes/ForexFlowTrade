@@ -86,23 +86,26 @@ const AllUsers = () => {
   // Calculate stats from users data if KPIs endpoint is not available
   const calculateStatsFromUsers = (usersData) => {
     const totalUsers = usersData.length;
-    const verifiedUsers = usersData.filter(user => user.isVerified).length;
-    const unverifiedUsers = usersData.filter(user => !user.isVerified).length;
+    // Handle undefined/null values properly - only count explicitly true as verified
+    const verifiedUsers = usersData.filter(user => user.isVerified === true || user.isVerified === 'true').length;
+    // Count false, null, or undefined as unverified
+    const unverifiedUsers = usersData.filter(user => user.isVerified === false || user.isVerified === null || user.isVerified === undefined).length;
     
     // Calculate new users (last 30 days)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     
     const newUsers = usersData.filter(user => {
+      if (!user.createdAt) return false;
       const userDate = new Date(user.createdAt);
       return userDate >= thirtyDaysAgo;
     }).length;
 
     return {
-      totalUsers,
-      activeUsers: verifiedUsers,
-      suspendedUsers: unverifiedUsers,
-      newUsers
+      totalUsers: Math.max(0, totalUsers),
+      activeUsers: Math.max(0, verifiedUsers),
+      suspendedUsers: Math.max(0, unverifiedUsers),
+      newUsers: Math.max(0, newUsers)
     };
   };
 

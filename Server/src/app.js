@@ -1,3 +1,5 @@
+import dotenv from "dotenv";
+dotenv.config();
 import Express  from "express";
 const app = Express();
 import cookieParser from "cookie-parser";
@@ -20,10 +22,14 @@ app.use(morgan("dev"));
 
 const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // max 100 requests per IP per 15 mins
+    max: 200, // max 200 requests per IP per 15 mins (increased to handle React StrictMode double renders)
     standardHeaders: true,
     legacyHeaders: false,
     message: "Too many requests, please try again later.",
+    skip: (req) => {
+        // Skip rate limiting for health checks
+        return req.path === '/api/v1' || req.path === '/';
+    },
 });
 app.use("/api/", apiLimiter);  // Apply limiter only to API routes
 

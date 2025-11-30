@@ -17,6 +17,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 import api from '@/utils/axios';
+import { formatError } from '@/utils/errorHandler';
 
 const UserDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -51,15 +52,20 @@ const UserDashboard = () => {
   //     .catch(() => setLoading(false));
   // }, [data,overviewStats, transactions    ]);
   
-  api.get('/user/transaction-history?limit=5')
-  .then(res => setTransactions(res.data.data.transactions))
-  .catch(() => {});
-  
   useEffect(() => {
+    let isMounted = true;
     setLoading(true);
-    api.get('/dashboard/user')
-      .then(res => {
-        const data = res.data;
+    
+    // Fetch dashboard data and transactions in parallel
+    Promise.all([
+      api.get('/dashboard/user'),
+      api.get('/user/transaction-history?limit=5')
+    ])
+      .then(([dashboardRes, transactionsRes]) => {
+        if (!isMounted) return;
+        
+        // Handle dashboard data
+        const data = dashboardRes.data;
         setData(data);
         setMainStats([
           { title: 'Account Balance', value: `$${Number(data.accountBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, icon: Wallet, trend: { value: '0%', isUp: true } },
@@ -73,9 +79,32 @@ const UserDashboard = () => {
           { title: 'Profit/Loss', value: `${data.profitLoss >= 0 ? '+' : '-'}$${Math.abs(Number(data.profitLoss || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}` },
           { title: 'Order Investment', value: `$${Number(data.orderInvestment || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}` },
         ]);
+        
+        // Handle transactions data
+        if (transactionsRes.data?.data?.transactions) {
+          setTransactions(transactionsRes.data.data.transactions);
+        }
       })
-      .catch(err => console.error(err))
-      .finally(() => setLoading(false));
+      .catch(err => {
+        if (!isMounted) return;
+        console.error('Error fetching dashboard data:', err);
+        // Set empty transactions on error to prevent undefined errors
+        setTransactions([]);
+        // Log rate limit errors specifically
+        if (err.response?.status === 429) {
+          console.warn(formatError(err, 'loading dashboard data'));
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setLoading(false);
+        }
+      });
+    
+    // Cleanup function to prevent state updates if component unmounts
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // Status badge component

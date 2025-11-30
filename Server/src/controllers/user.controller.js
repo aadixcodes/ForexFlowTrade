@@ -7,15 +7,90 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import Transaction from "../models/transaction.model.js";
 import OrderHistory from "../models/orderhistory.model.js";
 
+// Note: dotenv should be loaded in index.js before this module is imported
+// This is just a safety fallback
 
-const transporter = nodemailer.createTransport({
-    host: 'smtp.ethereal.email',
-    port: 587,
-    auth: {
-        user: 'rex.spinka@ethereal.email',
-        pass: 'Dt12U39mGY7jdhatwk'
+
+
+// Email transporter configuration using nodemailer service
+// Uses service-based configuration (Gmail, Outlook, etc.) instead of direct SMTP
+const createTransporter = () => {
+    // Use EMAIL_USER for auth (fallback to EMAIL_FROM if EMAIL_USER not set)
+    let emailUser = process.env.EMAIL_USER || process.env.EMAIL_FROM;
+    let emailPass = process.env.EMAIL_PASS;
+    
+    // Remove quotes if present (dotenv sometimes includes them)
+    if (emailUser) {
+        emailUser = emailUser.trim().replace(/^["']|["']$/g, '');
     }
-});
+    if (emailPass) {
+        emailPass = emailPass.trim().replace(/^["']|["']$/g, '');
+    }
+    
+    // Debug logging - show raw values
+    console.log("Email configuration check (raw):", {
+        EMAIL_USER: process.env.EMAIL_USER ? `"${process.env.EMAIL_USER}"` : "✗ Missing",
+        EMAIL_FROM: process.env.EMAIL_FROM ? `"${process.env.EMAIL_FROM}"` : "✗ Missing",
+        EMAIL_PASS: process.env.EMAIL_PASS ? "✓ Set (hidden)" : "✗ Missing",
+        EMAIL_SERVICE: process.env.EMAIL_SERVICE || "gmail (default)"
+    });
+    
+    console.log("Email configuration check (processed):", {
+        emailUser: emailUser || "✗ Missing",
+        emailPass: emailPass ? "✓ Set (hidden)" : "✗ Missing",
+        emailService: process.env.EMAIL_SERVICE || "gmail (default)"
+    });
+    
+    // Check if email credentials are configured
+    if (!emailUser || !emailPass) {
+        console.warn("Email credentials not configured. Email sending will be disabled.");
+        console.warn("Required: EMAIL_USER (or EMAIL_FROM) and EMAIL_PASS");
+        return null;
+    }
+
+    try {
+        const transporter = nodemailer.createTransport({
+            service: process.env.EMAIL_SERVICE || 'gmail', // Options: 'gmail', 'outlook', 'yahoo', etc.
+            auth: {
+                user: emailUser,
+                pass: emailPass
+            },
+            // Add timeout to prevent hanging
+            connectionTimeout: 5000,
+            greetingTimeout: 5000,
+            socketTimeout: 10000
+        });
+        
+        // Verify connection on creation
+        transporter.verify((error, success) => {
+            if (error) {
+                console.error("Email transporter verification failed:", error.message);
+            } else {
+                console.log("✓ Email transporter is ready to send messages");
+            }
+        });
+        
+        return transporter;
+    } catch (error) {
+        console.error("Failed to create email transporter:", error.message);
+        return null;
+    }
+};
+
+// Create transporter lazily - only when needed, so env vars are fully loaded
+let transporterInstance = null;
+const getTransporter = () => {
+    if (!transporterInstance) {
+        console.log("📧 Creating email transporter (lazy initialization)...");
+        transporterInstance = createTransporter();
+        if (transporterInstance) {
+            console.log("✓ Email transporter created successfully");
+        } else {
+            console.warn("✗ Email transporter creation failed - email sending disabled");
+        }
+    }
+    return transporterInstance;
+};
 
 
 // import jwt from "jsonwebtoken"
@@ -42,36 +117,74 @@ const generateAccessToken = async (userId) => {
 }
 
 
+// Helper function to generate random alphanumeric password
+const generateRandomPassword = (length = 12) => {
+    const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let password = '';
+    for (let i = 0; i < length; i++) {
+        password += charset.charAt(Math.floor(Math.random() * charset.length));
+    }
+    return password;
+};
+
 const register = async (req, res) => {
     console.log("Register controller called");
     console.log("Request body:", req.body);
     console.log("Request files:", req.files);
     
     try {
-        const { email, password, firstName, lastName, phone, aadharNo, pan, gender, dob, nomineeName, nomineeRelation, nomineeDob, bankName, accountNumber, accountHolder, ifscCode, address } = req.body;
+        // Password is no longer required - will be generated automatically
+        const { email, firstName, lastName, phone, aadharNo, pan, gender, dob, nomineeName, nomineeRelation, nomineeDob, bankName, accountNumber, accountHolder, ifscCode, address } = req.body;
         
         // Check if files are uploaded
         const files = req.files;
         console.log("Files received:", files);
+        console.log("Files structure:", JSON.stringify(files, null, 2));
         
-        if (!files || !files.aadharPhoto || !files.panPhoto || !files.userPhoto) {
+        // Validate files structure - files should be arrays with at least one element
+        if (!files) {
+            console.log("No files received in request");
+            return res.status(400).json({
+                status: "fail",
+                message: "Please upload all required documents (Aadhar, PAN, and User photo)"
+            });
+        }
+        
+        const aadharPhoto = Array.isArray(files.aadharPhoto) ? files.aadharPhoto[0] : files.aadharPhoto;
+        const panPhoto = Array.isArray(files.panPhoto) ? files.panPhoto[0] : files.panPhoto;
+        const userPhoto = Array.isArray(files.userPhoto) ? files.userPhoto[0] : files.userPhoto;
+        
+        if (!aadharPhoto || !panPhoto || !userPhoto) {
             console.log("Missing files:", {
                 hasFiles: !!files,
-                hasAadhar: !!files?.aadharPhoto,
-                hasPan: !!files?.panPhoto,
-                hasUser: !!files?.userPhoto
+                hasAadhar: !!aadharPhoto,
+                hasPan: !!panPhoto,
+                hasUser: !!userPhoto,
+                fileKeys: files ? Object.keys(files) : []
             });
             return res.status(400).json({
                 status: "fail",
                 message: "Please upload all required documents (Aadhar, PAN, and User photo)"
             });
         }
+        
+        // Ensure files have path property (Cloudinary URL)
+        if (!aadharPhoto.path || !panPhoto.path || !userPhoto.path) {
+            console.log("Files missing path property:", {
+                aadharPath: !!aadharPhoto?.path,
+                panPath: !!panPhoto?.path,
+                userPath: !!userPhoto?.path
+            });
+            return res.status(400).json({
+                status: "fail",
+                message: "File upload failed. Please try again."
+            });
+        }
 
-        // Check if all required fields are present
-        if (!email || !password || !firstName || !lastName || !phone || !aadharNo || !pan || !gender || !dob || !nomineeName || !nomineeRelation || !nomineeDob || !bankName || !accountNumber || !accountHolder || !ifscCode || !address) {
+        // Check if all required fields are present (password removed from required fields)
+        if (!email || !firstName || !lastName || !phone || !aadharNo || !pan || !gender || !dob || !nomineeName || !nomineeRelation || !nomineeDob || !bankName || !accountNumber || !accountHolder || !ifscCode || !address) {
             console.log("Missing fields:", {
                 email: !!email,
-                password: !!password,
                 firstName: !!firstName,
                 lastName: !!lastName,
                 phone: !!phone,
@@ -94,7 +207,7 @@ const register = async (req, res) => {
             });
         }
 
-        // Check if user already exists
+        // Check if user already exists - optimized query with select only needed fields
         const userExists = await User.findOne({
             $or: [
                 { email },
@@ -102,7 +215,7 @@ const register = async (req, res) => {
                 { pan },
                 { aadharNo }
             ]
-        });
+        }).select('_id').lean(); // Use lean() for faster query and only select _id
 
         if (userExists) {
             return res.status(400).json({
@@ -111,6 +224,14 @@ const register = async (req, res) => {
             });
         }
 
+        // Generate random alphanumeric password
+        const generatedPassword = generateRandomPassword(12);
+        
+        // Use the normalized file references
+        const aadharPhotoPath = aadharPhoto.path;
+        const panPhotoPath = panPhoto.path;
+        const userPhotoPath = userPhoto.path;
+        
         console.log("Creating new user with data:", {
             name: `${firstName} ${lastName}`,
             email,
@@ -121,16 +242,16 @@ const register = async (req, res) => {
             accountNumber,
             accountHolder,
             ifscCode,
-            aadharPhoto: files.aadharPhoto[0].path,
-            panPhoto: files.panPhoto[0].path,
-            userPhoto: files.userPhoto[0].path
+            aadharPhoto: aadharPhotoPath,
+            panPhoto: panPhotoPath,
+            userPhoto: userPhotoPath
         });
 
-        // Create new user
+        // Create new user with generated password
         const newUser = new User({
                 name: `${firstName} ${lastName}`,
                 email,
-                password,
+                password: generatedPassword, // Auto-generated password
                 phone,
                 aadharNo,
                 pan,
@@ -145,61 +266,72 @@ const register = async (req, res) => {
                 ifscCode,
                 address,
             // Add document URLs from Cloudinary
-            aadharPhoto: files.aadharPhoto[0].path,
-            panPhoto: files.panPhoto[0].path,
-            userPhoto: files.userPhoto[0].path
+            aadharPhoto: aadharPhotoPath,
+            panPhoto: panPhotoPath,
+            userPhoto: userPhotoPath,
+            isVerified: false // User starts as unverified
         });
 
         // Save user first
         await newUser.save();
-        console.log("User saved successfully");
+        console.log("User saved successfully with generated password:", newUser._id);
 
         // Send email asynchronously (don't block registration if email fails)
-        transporter.sendMail({
-            from: '"Forex Flow" <maddison53@ethereal.email>',
-            to: email,
-            subject: "User Registration Successful",
-            text: `Welcome to forex! Your registration is successful. Your login email is ${email} and password is ${password}. Please keep your credentials safe.`,
-            html: `
-            <h2>Welcome to Forex Flow</h2>
-            <p>Your registration is successful. Here are your details:</p>
-            <h3>Login Information</h3>
-            <p><strong>Email:</strong> ${email}</p>
-            <p><strong>Password:</strong> ${password}</p>
-            <p>Please keep your password safe.</p>
-            
-            <h3>Personal Details</h3>
-            <p><strong>Name:</strong> ${firstName} ${lastName}</p>
-            <p><strong>Phone:</strong> ${phone}</p>
-            <p><strong>Gender:</strong> ${gender}</p>
-            <p><strong>Date of Birth:</strong> ${dob}</p>
-            <p><strong>Address:</strong> ${address}</p>
-            
-            <h3>ID Details</h3>
-            <p><strong>Aadhar Number:</strong> ${aadharNo}</p>
-            <p><strong>PAN:</strong> ${pan}</p>
-            
-            <h3>Nominee Details</h3>
-            <p><strong>Name:</strong> ${nomineeName}</p>
-            <p><strong>Relation:</strong> ${nomineeRelation}</p>
-            <p><strong>Date of Birth:</strong> ${nomineeDob}</p>
-            
-            <h3>Bank Details</h3>
-            <p><strong>Bank Name:</strong> ${bankName}</p>
-            <p><strong>Account Number:</strong> ${accountNumber}</p>
-            <p><strong>Account Holder:</strong> ${accountHolder}</p>
-            <p><strong>IFSC Code:</strong> ${ifscCode}</p>
-            `
-        }).then(info => {
-            console.log("Email sent successfully:", info.messageId);
-        }).catch(emailError => {
-            console.error("Email sending failed (but user was created):", emailError.message);
-        });
+        // Email 1: Sent when user registers - informs them they'll get password after verification
+        // Note: This is completely non-blocking - response is sent immediately
+        const registrationEmailTransporter = getTransporter();
+        if (registrationEmailTransporter) {
+            // Use setImmediate to ensure this runs after the response is sent
+            setImmediate(() => {
+                registrationEmailTransporter.sendMail({
+                    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+                    to: email,
+                    subject: "Profile Approval Request Submitted",
+                    text: `Dear ${firstName} ${lastName},\n\nYour profile approval request has been submitted successfully. Our admin team will review your profile and you will receive an email notification once your profile is approved or rejected.\n\nIMPORTANT: After verification, you will receive your login password via email to access and login to your account.\n\nThank you for registering with Forex Flow!`,
+                    html: `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                        <h2 style="color: #43B852;">Profile Approval Request Submitted</h2>
+                        <p>Dear ${firstName} ${lastName},</p>
+                        <p>Your profile approval request has been submitted successfully. Our admin team will review your profile and you will receive an email notification once your profile is approved or rejected.</p>
+                        
+                        <div style="background-color: #e7f3ff; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #2196F3;">
+                            <h3 style="color: #0E1F1B; margin-top: 0;">📧 About Your Login Credentials</h3>
+                            <p style="margin: 0;"><strong>After verification, you will receive your login password via email to access and login to your account.</strong></p>
+                        </div>
+                        
+                        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                            <h3 style="color: #0E1F1B; margin-top: 0;">What's Next?</h3>
+                            <ul>
+                                <li>Your profile is currently under review by our admin team</li>
+                                <li>Once verified, you will receive an email with your login password</li>
+                                <li>If your profile is rejected, you will receive a notification email with details</li>
+                            </ul>
+                        </div>
+                        
+                        <p><strong>Note:</strong> Please do not reply to this email. If you have any questions, please contact our support team.</p>
+                        
+                        <p>Thank you for registering with <strong>Forex Flow</strong>!</p>
+                        
+                        <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
+                        <p style="color: #666; font-size: 12px;">This is an automated message. Please do not reply to this email.</p>
+                    </div>
+                    `
+                }).then(info => {
+                    console.log("Approval request email sent successfully:", info.messageId);
+                }).catch(emailError => {
+                    console.error("Email sending failed (but user was created):", emailError.message);
+                });
+            });
+        } else {
+            console.warn("Email transporter not available. Skipping registration email.");
+            console.warn("To enable email sending, configure EMAIL_USER and EMAIL_PASS environment variables.");
+        }
 
-        // Return success immediately after user is saved
+        // Return success immediately after user is saved (don't wait for email)
+        console.log("Sending success response for user:", newUser._id);
         return res.status(201).json({
             status: "success",
-            message: "Registration successful! Please check your email for login credentials."
+            message: "Registration successful! Your profile approval request has been submitted. You will receive an email notification once your profile is reviewed by the admin."
         });
 
     } catch (error) {
@@ -1241,15 +1373,67 @@ const userapprove = async (req, res) => {
             });
         }
 
+        // Generate a new password for the user when approved
+        // This password will be sent to the user via email
+        const newPassword = generateRandomPassword(12);
+        
+        // Update user with new password and verification status
+        // Password will be automatically hashed by the pre-save hook
+        user.password = newPassword;
         user.isVerified = true;
         await user.save();
 
+        // Send approval email with login credentials (non-blocking)
+        const approvalEmailTransporter = getTransporter();
+        if (approvalEmailTransporter) {
+            setImmediate(() => {
+                approvalEmailTransporter.sendMail({
+                    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+                    to: user.email,
+                    subject: "Profile Approved - Your Login Credentials",
+                    text: `Dear ${user.name},\n\nCongratulations! Your profile has been approved by our admin team.\n\nYour login credentials are:\nEmail: ${user.email}\nPassword: ${newPassword}\n\nPlease keep your password safe and secure. You can now log in to your account.\n\nThank you for choosing Forex Flow!`,
+                    html: `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                        <h2 style="color: #43B852;">Profile Approved!</h2>
+                        <p>Dear ${user.name},</p>
+                        <p>Congratulations! Your profile has been approved by our admin team.</p>
+                        
+                        <div style="background-color: #f5f5f5; padding: 20px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #43B852;">
+                            <h3 style="color: #0E1F1B; margin-top: 0;">Your Login Credentials</h3>
+                            <p><strong>Email:</strong> ${user.email}</p>
+                            <p><strong>Password:</strong> <code style="background-color: #fff; padding: 5px 10px; border-radius: 3px; font-size: 16px; letter-spacing: 2px;">${newPassword}</code></p>
+                        </div>
+                        
+                        <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ffc107;">
+                            <p style="margin: 0;"><strong>⚠️ Important:</strong> Please keep your password safe and secure. Do not share it with anyone.</p>
+                        </div>
+                        
+                        <p>You can now log in to your account using the credentials above.</p>
+                        
+                        <p>Thank you for choosing <strong>Forex Flow</strong>!</p>
+                        
+                        <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
+                        <p style="color: #666; font-size: 12px;">This is an automated message. Please do not reply to this email.</p>
+                    </div>
+                    `
+                }).then(info => {
+                    console.log("Approval email with credentials sent successfully:", info.messageId);
+                }).catch(emailError => {
+                    console.error("Email sending failed (but user was approved):", emailError.message);
+                });
+            });
+        } else {
+            console.warn("Email transporter not available. Approval email not sent. User approved successfully with password:", newPassword);
+        }
+        
         res.status(200).json({
             status: "success",
-            message: "User approved successfully",
+            message: `User approved successfully. ${approvalEmailTransporter ? "Login credentials have been sent to the user's email." : "Note: Email credentials not configured. Password: " + newPassword}`,
             data: {
                 userId: user._id,
-                isVerified: user.isVerified
+                isVerified: user.isVerified,
+                emailSent: !!approvalEmailTransporter,
+                ...(approvalEmailTransporter ? {} : { password: newPassword }) // Include password in response if email not sent
             }
         });
     } catch (error) {
@@ -1285,12 +1469,60 @@ const userreject = async (req, res) => {
         user.isVerified = false;
         await user.save();
 
+        // Send rejection email (non-blocking)
+        const rejectionEmailTransporter = getTransporter();
+        if (rejectionEmailTransporter) {
+            setImmediate(() => {
+                rejectionEmailTransporter.sendMail({
+                    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+                    to: user.email,
+                    subject: "Profile Verification Rejected",
+                    text: `Dear ${user.name},\n\nWe regret to inform you that your profile verification request has been rejected by our admin team.\n\nIf you believe this is an error or would like to resubmit your profile, please contact our support team for assistance.\n\nThank you for your interest in Forex Flow.`,
+                    html: `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                        <h2 style="color: #dc3545;">Profile Verification Rejected</h2>
+                        <p>Dear ${user.name},</p>
+                        <p>We regret to inform you that your profile verification request has been rejected by our admin team.</p>
+                        
+                        <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #dc3545;">
+                            <p style="margin: 0; color: #721c24;"><strong>What does this mean?</strong></p>
+                            <p style="margin: 10px 0 0 0; color: #721c24;">Your profile did not meet our verification requirements. This could be due to incomplete information, document issues, or other verification criteria.</p>
+                        </div>
+                        
+                        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                            <h3 style="color: #0E1F1B; margin-top: 0;">What can you do?</h3>
+                            <ul>
+                                <li>Review your submitted information and documents</li>
+                                <li>Contact our support team if you believe this is an error</li>
+                                <li>You may resubmit your profile after addressing any issues</li>
+                            </ul>
+                        </div>
+                        
+                        <p>If you have any questions or need assistance, please contact our support team.</p>
+                        
+                        <p>Thank you for your interest in <strong>Forex Flow</strong>.</p>
+                        
+                        <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
+                        <p style="color: #666; font-size: 12px;">This is an automated message. Please do not reply to this email.</p>
+                    </div>
+                    `
+                }).then(info => {
+                    console.log("Rejection email sent successfully:", info.messageId);
+                }).catch(emailError => {
+                    console.error("Email sending failed (but user was rejected):", emailError.message);
+                });
+            });
+        } else {
+            console.warn("Email transporter not available. Rejection email not sent. User rejected successfully.");
+        }
+
         res.status(200).json({
             status: "success",
-            message: "User rejected successfully",
+            message: `User rejected successfully. ${rejectionEmailTransporter ? "Rejection notification has been sent to the user's email." : "Note: Email transporter not configured. Email not sent."}`,
             data: {
                 userId: user._id,
-                isVerified: user.isVerified
+                isVerified: user.isVerified,
+                emailSent: !!rejectionEmailTransporter
             }
         });
     } catch (error) {
@@ -1304,17 +1536,26 @@ const userreject = async (req, res) => {
 }
 
 const getUserbyId = async (req, res) => {
-    // Get userId from params, body, or query (flexible approach)
-    const userId = req.params.id || req.body.userId || req.query.userId;
-    
-    if (!userId) {
-        return res.status(400).json({
-            status: "fail",
-            message: "User ID is required"
-        });
-    }
-
     try {
+        // Get userId from params, body, or query (flexible approach)
+        // Add defensive checks to prevent undefined errors
+        const userId = req.params?.id || req.body?.userId || req.query?.userId;
+        
+        if (!userId) {
+            return res.status(400).json({
+                status: "fail",
+                message: "User ID is required"
+            });
+        }
+
+        // Validate MongoDB ObjectId format
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            return res.status(400).json({
+                status: "fail",
+                message: "Invalid user ID format"
+            });
+        }
+
         const user = await User.findById(userId).select('name email phone aadharNo pan bankName accountNumber accountHolder ifscCode isVerified createdAt updatedAt aadharPhoto panPhoto userPhoto');
         if (!user) {
             return res.status(404).json({
@@ -1333,32 +1574,72 @@ const getUserbyId = async (req, res) => {
         };
 
         try {
-            const balanceData = await User.getUserBalances(userId);
-            if (balanceData) {
-                balanceInfo.accountBalance = balanceData.totalBalance || 0;
-                balanceInfo.totalDeposit = balanceData.totalDeposited || 0;
-                balanceInfo.totalWithdrawals = balanceData.totalWithdrawn || 0;
-            }
-
-            // Get order investment and profit/loss from OrderHistory
-            const orderStats = await OrderHistory.aggregate([
-                { $match: { userId: new mongoose.Types.ObjectId(userId) } },
+            // Convert userId to ObjectId
+            const userIdObjectId = new mongoose.Types.ObjectId(userId);
+            
+            // Calculate balance directly using Transaction model (more reliable than static method)
+            const balanceData = await Transaction.aggregate([
+                { $match: { userId: userIdObjectId } },
                 {
                     $group: {
                         _id: null,
-                        totalInvestment: { $sum: '$tradeAmount' },
-                        totalProfitLoss: { $sum: '$profitLoss' }
+                        totalDeposits: {
+                            $sum: {
+                                $cond: [
+                                    { $and: [{ $eq: ['$type', 'DEPOSIT'] }, { $eq: ['$status', 'COMPLETED'] }] },
+                                    '$amount',
+                                    0
+                                ]
+                            }
+                        },
+                        totalWithdrawals: {
+                            $sum: {
+                                $cond: [
+                                    { $and: [{ $eq: ['$type', 'WITHDRAWAL'] }, { $eq: ['$status', 'COMPLETED'] }] },
+                                    '$amount',
+                                    0
+                                ]
+                            }
+                        }
                     }
                 }
             ]);
 
-            if (orderStats.length > 0) {
+            if (balanceData && balanceData.length > 0) {
+                const data = balanceData[0];
+                balanceInfo.totalDeposit = data.totalDeposits || 0;
+                balanceInfo.totalWithdrawals = data.totalWithdrawals || 0;
+                balanceInfo.accountBalance = (data.totalDeposits || 0) - (data.totalWithdrawals || 0);
+            }
+
+            // Get order investment and profit/loss from OrderHistory
+            const orderStats = await OrderHistory.aggregate([
+                { $match: { userId: userIdObjectId } },
+                {
+                    $group: {
+                        _id: null,
+                        totalInvestment: { 
+                            $sum: { 
+                                $ifNull: ['$tradeAmount', 0] 
+                            } 
+                        },
+                        totalProfitLoss: { 
+                            $sum: { 
+                                $ifNull: ['$profitLoss', 0] 
+                            } 
+                        }
+                    }
+                }
+            ]);
+
+            if (orderStats && orderStats.length > 0) {
                 balanceInfo.orderInvestment = orderStats[0].totalInvestment || 0;
                 balanceInfo.profitLoss = orderStats[0].totalProfitLoss || 0;
             }
         } catch (balanceError) {
             console.error('Error fetching balance info:', balanceError);
-            // Continue without balance info if it fails
+            console.error('Balance error stack:', balanceError.stack);
+            // Continue without balance info if it fails - return default values
         }
 
         res.status(200).json({
@@ -1394,12 +1675,51 @@ const getAllUsers = async (req, res) => {
             .skip(skip)
             .limit(limit);
 
+        // Get last transaction for each user
+        const userIds = users.map(user => user._id);
+        const lastTransactions = await Transaction.aggregate([
+            {
+                $match: {
+                    userId: { $in: userIds }
+                }
+            },
+            {
+                $sort: { timestamp: -1 }
+            },
+            {
+                $group: {
+                    _id: '$userId',
+                    lastTransaction: { $first: '$timestamp' }
+                }
+            }
+        ]);
+
+        // Create a map of userId to lastTransaction
+        const lastTransactionMap = {};
+        lastTransactions.forEach(item => {
+            lastTransactionMap[item._id.toString()] = item.lastTransaction;
+        });
+
+        // Add lastTransaction to each user
+        const usersWithLastTransaction = users.map(user => {
+            const userObj = user.toObject();
+            const lastTrans = lastTransactionMap[user._id.toString()];
+            userObj.lastTransaction = lastTrans 
+                ? new Date(lastTrans).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit'
+                })
+                : 'N/A';
+            return userObj;
+        });
+
         const totalUsers = await User.countDocuments();
 
         res.status(200).json({
             status: "success",
             message: "Users retrieved successfully",
-            data: users,
+            data: usersWithLastTransaction,
             pagination: {
                 page,
                 limit,
@@ -1418,8 +1738,25 @@ const getAllUsers = async (req, res) => {
 }
 
 const deleteUserById = async (req, res) => {
-    const { userId } =  req.params.id || req.body.userId || req.query.userId;
+    // Get userId from params, body, or query (flexible approach)
+    const userId = req.params.id || req.body.userId || req.query.userId;
+    
+    if (!userId) {
+        return res.status(400).json({
+            status: "fail",
+            message: "User ID is required"
+        });
+    }
+
     try {
+        // Validate MongoDB ObjectId format
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            return res.status(400).json({
+                status: "fail",
+                message: "Invalid user ID format"
+            });
+        }
+
         const user = await User.findByIdAndDelete(userId);
         if(!user) {
             return res.status(404).json({
@@ -1433,6 +1770,7 @@ const deleteUserById = async (req, res) => {
             message: "User deleted successfully"
         });
     } catch (error) {
+        console.error('Error deleting user:', error);
         res.status(500).json({
             status: "error",
             message: "Internal server error",

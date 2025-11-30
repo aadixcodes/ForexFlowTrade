@@ -281,7 +281,9 @@ const TradesOrderHistory = () => {
       // Better error handling based on axios error structure
       let errorMessage = 'Failed to fetch order history';
       
-      if (err.response) {
+      if (isRateLimit(err)) {
+        errorMessage = formatError(err, 'fetching order history');
+      } else if (err.response) {
         // Server responded with error status
         errorMessage = err.response.data?.message || `Server error: ${err.response.status}`;
       } else if (err.request) {

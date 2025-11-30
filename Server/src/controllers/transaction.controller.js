@@ -284,6 +284,7 @@
 
 //----------------------------------------------New Code----------------------------------------------
 
+import mongoose from 'mongoose';
 import Transaction from '../models/transaction.model.js';
 import User from '../models/user.model.js';
 import { ApiError } from '../utils/ApiError.js';
@@ -818,16 +819,13 @@ const getAllDeposits = asyncHandler(async (req, res) => {
 const getAllPendingWithdrawals = asyncHandler(async (req, res) => {
   try {
     const withdrawals = await Transaction.find({ type: 'WITHDRAWAL', status: 'PENDING' })
-      .populate('userId', 'name');
+      .populate('userId', 'name email phone _id');
 
-    const totalPending = withdrawals.length;
+    const totalPending = withdrawals ? withdrawals.length : 0;
 
-    if (!withdrawals || withdrawals.length === 0) {
-      throw new ApiError(404, "No pending withdrawals found");
-    }
-
+    // Return 0 instead of throwing 404 when there are no pending withdrawals
     return res.status(200).json(
-      new ApiResponse(200,{ totalPending, withdrawals }, "All pending withdrawals retrieved successfully")
+      new ApiResponse(200, { totalPending, withdrawals: withdrawals || [] }, "All pending withdrawals retrieved successfully")
     );
   } catch (error) {
     console.error('getAllPendingWithdrawals error:', error.message, error.stack);
@@ -932,23 +930,57 @@ const rejectWithdrawal = asyncHandler(async (req, res) => {
 const getAllWithdrawals = asyncHandler(async (req, res) => {
   try {
     const withdrawals = await Transaction.find({ type: 'WITHDRAWAL' })
-      .populate('userId', 'name email amount date method status');
+      .populate('userId', 'name email phone _id');
 
-    const totalWithdrawals = withdrawals.length;
+    const totalWithdrawals = withdrawals ? withdrawals.length : 0;
+    const totalAmount = withdrawals && withdrawals.length > 0 
+      ? withdrawals.reduce((sum, withdrawal) => sum + (withdrawal.amount || 0), 0)
+      : 0;
 
-    const totalAmount = withdrawals.reduce((sum, withdrawal) => sum + withdrawal.amount, 0);
-
-    if (!withdrawals || withdrawals.length === 0) {
-      throw new ApiError(404, "No withdrawals found");
-    }
-
+    // Return empty array instead of throwing 404 when there are no withdrawals
     return res.status(200).json(
-      new ApiResponse(200, {withdrawals, totalWithdrawals , totalAmount}, "All withdrawals retrieved successfully")
+      new ApiResponse(200, {withdrawals: withdrawals || [], totalWithdrawals, totalAmount}, "All withdrawals retrieved successfully")
     );
   } catch (error) {
     throw new ApiError(500, "Failed to retrieve all withdrawals");
   }
 
+});
+
+// Admin: Get user transactions by userId
+const getUserTransactions = asyncHandler(async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    if (!userId) {
+      throw new ApiError(400, "User ID is required");
+    }
+
+    // Convert userId to ObjectId if it's a string
+    let userIdObjectId;
+    
+    if (mongoose.Types.ObjectId.isValid(userId)) {
+      userIdObjectId = userId instanceof mongoose.Types.ObjectId 
+        ? userId 
+        : new mongoose.Types.ObjectId(userId);
+    } else {
+      throw new ApiError(400, "Invalid user ID format");
+    }
+
+    console.log('Fetching transactions for userId:', userIdObjectId);
+    const transactions = await Transaction.find({ userId: userIdObjectId })
+      .sort({ timestamp: -1 })
+      .populate('userId', 'name email');
+
+    console.log(`Found ${transactions.length} transactions for user ${userId}`);
+
+    return res.status(200).json(
+      new ApiResponse(200, transactions, "User transactions retrieved successfully")
+    );
+  } catch (error) {
+    console.error('Error in getUserTransactions:', error);
+    throw new ApiError(500, `Failed to retrieve user transactions: ${error.message}`);
+  }
 });
 
 
@@ -985,4 +1017,5 @@ export {
   approvedDeposit,
   rejectDeposit,
   getAllDeposits,
+  getUserTransactions
 };

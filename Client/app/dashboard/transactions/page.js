@@ -6,6 +6,7 @@ import StatCard from '../../../components/ui/StatCard';
 import StatusBadge from '../../../components/ui/StatusBadge';
 import { Skeleton } from '@/components/ui/skeleton';
 import fetch from "@/utils/axios";
+import { formatError, isRateLimit } from "@/utils/errorHandler";
 
 
 const TransactionsPage = () => {
@@ -45,6 +46,9 @@ const TransactionsPage = () => {
         }
       } catch (err) {
         console.error('Failed to fetch transactions', err);
+        if (isRateLimit(err)) {
+          console.warn(formatError(err, 'fetching transactions'));
+        }
       } finally {
         setLoading(false);
       }

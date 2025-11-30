@@ -10,6 +10,7 @@ import { Check, X, Eye } from 'lucide-react';
 
 import UserDetailsPopup from '@/components/UserDetailsPopup';
 import api from '@/utils/axios';
+import { formatError, isRateLimit } from '@/utils/errorHandler';
 
 const WithdrawRequest = () => {
   const [loading, setLoading] = useState(true);
@@ -28,76 +29,110 @@ const WithdrawRequest = () => {
         let withdrawals = [];
         try {
           const res = await api.get('/admin/get-all-pending-withdrawals');
+          // Handle ApiResponse format: res.data.data contains { totalPending, withdrawals }
           withdrawals = res.data?.data?.withdrawals || [];
         } catch (err) {
-          // If 404 (no pending withdrawals), treat as empty, not error
-          if (!(err.response && err.response.status === 404)) {
-            addToast('error', 'Failed to load withdrawal requests');
-          }
+          console.error('Error fetching pending withdrawals:', err);
+          const errorMessage = isRateLimit(err) 
+            ? formatError(err, 'loading withdrawal requests')
+            : 'Failed to load withdrawal requests';
+          addToast('error', errorMessage);
         }
         setWithdrawalRequests(
-          withdrawals.map(w => ({
-            id: w._id,
-            name: w.userId?.name || 'Unknown',
-            amount: `$${w.amount}`,
-            bank: w.bank || '-',
-            status: w.status?.toLowerCase() || 'pending',
-            user: w.userId,
-          }))
+          withdrawals.map(w => {
+            // Extract userId - handle both populated (object) and non-populated (string/ObjectId) cases
+            let userId = null;
+            if (w.userId) {
+              if (typeof w.userId === 'object' && w.userId._id) {
+                // Populated user object
+                userId = w.userId._id.toString ? w.userId._id.toString() : String(w.userId._id);
+              } else if (typeof w.userId === 'string') {
+                // String ID
+                userId = w.userId;
+              } else if (w.userId.toString) {
+                // ObjectId or other object with toString method
+                userId = w.userId.toString();
+              } else {
+                // Fallback: convert to string
+                userId = String(w.userId);
+              }
+            }
+
+            return {
+              id: w._id,
+              userId: userId, // Store userId for fetching details
+              name: w.userId?.name || 'Unknown',
+              amount: `$${w.amount}`,
+              bank: w.bank || '-',
+              status: w.status?.toLowerCase() || 'pending',
+              user: w.userId?.name || 'Unknown',
+              userEmail: w.userId?.email,
+              userPhone: w.userId?.phone,
+            };
+          })
         );
 
-        // Fetch stats (treat 404 as zero/empty, only show error for other errors)
+        // Fetch stats - endpoints now return 0 instead of 404
         const statResults = await Promise.all([
           (async () => {
             try {
               const res = await api.get('/admin/get-all-pending-withdrawals');
-              return { res, is404: false, isError: false };
+              return { res, isError: false };
             } catch (e) {
-              if (e.response && e.response.status === 404) {
-                return { res: { data: { data: { totalPending: 0 } } }, is404: true, isError: false };
-              } else {
-                return { res: { data: { data: { totalPending: 0 } } }, is404: false, isError: true };
+              console.error('Error fetching pending withdrawals stats:', e);
+              if (isRateLimit(e)) {
+                console.warn(formatError(e, 'fetching pending withdrawals stats'));
               }
+              return { res: { data: { data: { totalPending: 0, withdrawals: [] } } }, isError: true };
             }
           })(),
           (async () => {
             try {
               const res = await api.get('/admin/get-all-completed-withdrawals');
-              return { res, is404: false, isError: false };
+              return { res, isError: false };
             } catch (e) {
-              if (e.response && e.response.status === 404) {
-                return { res: { data: { data: { totalCompleted: 0 } } }, is404: true, isError: false };
-              } else {
-                return { res: { data: { data: { totalCompleted: 0 } } }, is404: false, isError: true };
+              console.error('Error fetching completed withdrawals stats:', e);
+              if (isRateLimit(e)) {
+                console.warn(formatError(e, 'fetching completed withdrawals stats'));
               }
+              return { res: { data: { data: { totalCompleted: 0 } } }, isError: true };
             }
           })(),
           (async () => {
             try {
               const res = await api.get('/admin/get-all-withdrawals');
-              return { res, is404: false, isError: false };
+              return { res, isError: false };
             } catch (e) {
-              if (e.response && e.response.status === 404) {
-                return { res: { data: { data: { withdrawals: [] } } }, is404: true, isError: false };
-              } else {
-                return { res: { data: { data: { withdrawals: [] } } }, is404: false, isError: true };
+              console.error('Error fetching all withdrawals stats:', e);
+              if (isRateLimit(e)) {
+                console.warn(formatError(e, 'fetching all withdrawals stats'));
               }
+              return { res: { data: { data: { withdrawals: [], totalWithdrawals: 0, totalAmount: 0 } } }, isError: true };
             }
           })(),
         ]);
         const [pendingStat, completedStat, allStat] = statResults;
-        // Only show error if ALL three stats fail with non-404 errors
+        // Only show error if ALL three stats fail
         if (statResults.every(stat => stat.isError)) {
-          addToast('error', 'Failed to load withdrawal requests');
+          addToast('error', 'Failed to load withdrawal statistics');
         }
+        
+        // Handle ApiResponse format: res.data.data contains the actual data
+        const allWithdrawals = allStat.res.data?.data?.withdrawals || [];
+        const totalAmount = allStat.res.data?.data?.totalAmount || 
+          (allWithdrawals.reduce((sum, w) => sum + (w.amount || 0), 0));
+        
         setStats([
-          { title: 'Total Requests', value: allStat.res.data?.data?.withdrawals?.length?.toString() || '0', icon: Wallet },
-          { title: 'Pending', value: pendingStat.res.data?.data?.totalPending?.toString() || '0', icon: TrendingUp },
-          { title: 'Total Amount', value: `$${allStat.res.data?.data?.withdrawals?.reduce((sum, w) => sum + (w.amount || 0), 0)}`, icon: Wallet },
-          { title: 'Completed', value: completedStat.res.data?.data?.totalCompleted?.toString() || '0', icon: CheckCircle },
+          { title: 'Total Requests', value: (allStat.res.data?.data?.totalWithdrawals || allWithdrawals.length || 0).toString(), icon: Wallet },
+          { title: 'Pending', value: (pendingStat.res.data?.data?.totalPending || 0).toString(), icon: TrendingUp },
+          { title: 'Total Amount', value: `$${totalAmount.toLocaleString()}`, icon: Wallet },
+          { title: 'Completed', value: (completedStat.res.data?.data?.totalCompleted || 0).toString(), icon: CheckCircle },
         ]);
       } catch (err) {
-        addToast('error', 'Failed to load withdrawal requests');
+        const errorMessage = isRateLimit(err)
+          ? formatError(err, 'loading withdrawal requests')
+          : 'Failed to load withdrawal requests';
+        addToast('error', errorMessage);
       }
       setLoading(false);
     };
@@ -158,22 +193,33 @@ const WithdrawRequest = () => {
     if (action === 'accept') {
       try {
         await api.post(`/admin/approve-withdrawal/${id}`);
-        setWithdrawalRequests(prev =>
-          prev.map(request =>
-            request.id === id ? { ...request, status: 'completed' } : request
-          )
-        );
+        // Remove from pending list
+        setWithdrawalRequests(prev => prev.filter(request => request.id !== id));
         addToast('success', 'Withdrawal request accepted successfully!');
-      } catch {
-        addToast('error', 'Failed to accept withdrawal request');
+        // Refresh stats after approval
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+      } catch (err) {
+        const errorMessage = isRateLimit(err)
+          ? formatError(err, 'accepting withdrawal request')
+          : 'Failed to accept withdrawal request';
+        addToast('error', errorMessage);
       }
     } else if (action === 'reject') {
       try {
         await api.post(`/admin/reject-withdrawal/${id}`);
         setWithdrawalRequests(prev => prev.filter(request => request.id !== id));
         addToast('error', 'Withdrawal request rejected successfully!');
-      } catch {
-        addToast('error', 'Failed to reject withdrawal request');
+        // Refresh stats after rejection
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+      } catch (err) {
+        const errorMessage = isRateLimit(err)
+          ? formatError(err, 'rejecting withdrawal request')
+          : 'Failed to reject withdrawal request';
+        addToast('error', errorMessage);
       }
     } else if (action === 'view') {
       const user = withdrawalRequests.find(w => w.id === id)?.user;
@@ -183,9 +229,110 @@ const WithdrawRequest = () => {
   };
 
 
-  const handleViewAction = (userId, userObj) => {
-    setSelectedUser(userObj);
-    setShowUserDetails(true);
+  const handleViewAction = async (withdrawalId, userObj) => {
+    try {
+      // Find the withdrawal request to get userId
+      let withdrawal = withdrawalRequests.find(w => w.id === withdrawalId);
+      
+      // Extract userId with multiple fallback options
+      let userId = withdrawal?.userId;
+      
+      // If userId is not available in local state, fetch the withdrawal from API
+      if (!userId && withdrawal) {
+        try {
+          const withdrawalRes = await api.get(`/admin/get-pending-withdrawal/${withdrawalId}`);
+          if (withdrawalRes.data?.data?.userId) {
+            const apiUserId = withdrawalRes.data.data.userId;
+            // Handle populated user object or direct ObjectId
+            if (typeof apiUserId === 'object' && apiUserId._id) {
+              userId = apiUserId._id.toString ? apiUserId._id.toString() : String(apiUserId._id);
+            } else if (typeof apiUserId === 'string') {
+              userId = apiUserId;
+            } else if (apiUserId?.toString) {
+              userId = apiUserId.toString();
+            } else {
+              userId = String(apiUserId);
+            }
+          }
+        } catch (fetchError) {
+          console.error('Error fetching withdrawal details:', fetchError);
+        }
+      }
+      
+      // If still no userId, show error
+      if (!userId) {
+        console.error('UserId not found. Withdrawal object:', withdrawal);
+        addToast('error', 'User ID not found in withdrawal request');
+        return;
+      }
+
+      // Ensure userId is a string
+      if (typeof userId !== 'string') {
+        userId = userId.toString ? userId.toString() : String(userId);
+      }
+
+      // Fetch full user details from API
+      const response = await api.get(`/admin/get-user/${userId}`);
+      
+      if (response.data.status === 'success' && response.data.data) {
+        const userData = response.data.data;
+        const balanceInfo = userData.balanceInfo || {};
+        
+        // Format user data to match UserDetailsPopup component structure
+        const formattedUser = {
+          name: userData.name || withdrawal.user || 'Unknown User',
+          personalInfo: {
+            name: userData.name || withdrawal.user || 'Unknown User',
+            email: userData.email || withdrawal.userEmail || 'No email provided',
+            phone: userData.phone || withdrawal.userPhone || 'No phone provided',
+            profileImage: userData.userPhoto || '/default-avatar.png'
+          },
+          kycInfo: {
+            aadharNumber: userData.aadharNo || 'Not provided',
+            panNumber: userData.pan || 'Not provided',
+            aadharPhoto: userData.aadharPhoto || '',
+            panPhoto: userData.panPhoto || '',
+            profilePhoto: userData.userPhoto || ''
+          },
+          bankDetails: {
+            bankName: userData.bankName || 'Not provided',
+            accountHolderName: userData.accountHolder || 'Not provided',
+            accountNumber: userData.accountNumber || 'Not provided',
+            ifscCode: userData.ifscCode || 'Not provided'
+          },
+          forexAccount: {
+            accountBalance: (balanceInfo.accountBalance !== undefined && balanceInfo.accountBalance !== null)
+              ? `$${Number(balanceInfo.accountBalance).toLocaleString()}` 
+              : '$0',
+            totalDeposit: (balanceInfo.totalDeposit !== undefined && balanceInfo.totalDeposit !== null)
+              ? `$${Number(balanceInfo.totalDeposit).toLocaleString()}` 
+              : '$0',
+            totalWithdrawals: (balanceInfo.totalWithdrawals !== undefined && balanceInfo.totalWithdrawals !== null)
+              ? `$${Number(balanceInfo.totalWithdrawals).toLocaleString()}` 
+              : '$0',
+            orderInvestment: (balanceInfo.orderInvestment !== undefined && balanceInfo.orderInvestment !== null)
+              ? `$${Number(balanceInfo.orderInvestment).toLocaleString()}` 
+              : '$0',
+            profitLoss: (balanceInfo.profitLoss !== undefined && balanceInfo.profitLoss !== null)
+              ? (Number(balanceInfo.profitLoss) >= 0 
+                  ? `+$${Number(balanceInfo.profitLoss).toLocaleString()}` 
+                  : `-$${Math.abs(Number(balanceInfo.profitLoss)).toLocaleString()}`)
+              : '$0'
+          }
+        };
+        
+        setSelectedUser(formattedUser);
+        setShowUserDetails(true);
+      } else {
+        addToast('error', 'Failed to fetch user details');
+      }
+    } catch (error) {
+      console.error('Error fetching user details:', error);
+      const errorMessage = isRateLimit(error)
+        ? formatError(error, 'fetching user details')
+        : (error.response?.data?.message || 'Failed to fetch user details');
+      addToast('error', errorMessage);
+    }
   };
 
   return (

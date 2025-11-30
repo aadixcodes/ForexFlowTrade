@@ -208,8 +208,13 @@ UserSchema.pre('save',async function (next){
 UserSchema.statics.getUserBalances = async function(userId) {
   const Transaction = mongoose.model('Transaction');
   
+  // Convert userId to ObjectId if it's a string
+  const userIdObjectId = mongoose.Types.ObjectId.isValid(userId) 
+    ? (userId instanceof mongoose.Types.ObjectId ? userId : new mongoose.Types.ObjectId(userId))
+    : userId;
+  
   const balanceData = await Transaction.aggregate([
-    { $match: { userId: userId } },
+    { $match: { userId: userIdObjectId } },
     {
       $group: {
         _id: null,

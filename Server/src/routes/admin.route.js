@@ -41,7 +41,8 @@ import {
   getVerifiedDepositById,
   approvedDeposit,
   rejectDeposit,
-  getAllDeposits
+  getAllDeposits,
+  getUserTransactions
 } from "../controllers/transaction.controller.js";
 
 // =============================================================================
@@ -72,6 +73,7 @@ router.route("/delete-user").delete(veriftyJWT, isAdmin, deleteUserById);
 
 // General Transaction Operations
 router.route("/transactions/:transactionId/status").patch(veriftyJWT, isAdmin, updateTransactionStatus);
+router.route("/get-user-transactions/:userId").get(veriftyJWT, isAdmin, getUserTransactions);
 
 // -----------------------------------------------------------------------------
 // DEPOSIT ROUTES
