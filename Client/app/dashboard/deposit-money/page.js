@@ -135,7 +135,7 @@ const UserDepositPage = () => {
             <div className="p-6 space-y-6">
               <div className="space-y-2">
                 <label className="block text-sm font-medium dark:text-[#F2F2F2]" htmlFor="amount">
-                  Amount (INR)
+                  Amount ($)
                 </label>
                 {loading ? (
                   <Skeleton className="h-10 w-full rounded-md" />
