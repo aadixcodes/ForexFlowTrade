@@ -29,11 +29,28 @@ const UserDepositPage = () => {
   const [showBankDetails, setShowBankDetails] = useState(false);
   const [loading, setLoading] = useState(true);
   const [userDepositHistory, setUserDepositHistory] = useState([]);
+  const [bankDetailsVisible, setBankDetailsVisible] = useState(false); // Default to false (hide bank details)
   
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
+        // Fetch bank details visibility setting
+        try {
+          const visibilityRes = await fetch.get('/user/bank-details-visibility');
+          // Handle ApiResponse format (statusCode, success, data)
+          if (visibilityRes.data.success === true || visibilityRes.data.statusCode === 200) {
+            setBankDetailsVisible(visibilityRes.data.data?.showBankDetails ?? false);
+          } else {
+            // If response format is unexpected, default to hiding bank details
+            setBankDetailsVisible(false);
+          }
+        } catch (error) {
+          console.error("Failed to fetch bank details visibility:", error);
+          // Default to hiding bank details if API fails (safer)
+          setBankDetailsVisible(false);
+        }
+
         const res = await fetch.get('/user/deposit-history'); 
         const { deposits } = res.data.data;
 
@@ -161,7 +178,7 @@ const UserDepositPage = () => {
                     <Skeleton className="h-20 rounded-lg" />
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className={`grid gap-4 ${bankDetailsVisible ? 'grid-cols-2' : 'grid-cols-1'}`}>
                     <button 
                       className={`p-4 border rounded-lg dark:border-[#2A3F3A] hover:bg-muted/50 dark:hover:bg-[#1A2E24] transition-colors ${selectedMethod === 'upi' ? 'bg-muted/30 dark:bg-[#1A2E24] ring-2 ring-blue-500' : ''}`}
                       onClick={() => handleMethodSelect('upi')}
@@ -171,21 +188,23 @@ const UserDepositPage = () => {
                         <span className="dark:text-[#F2F2F2]">UPI Payment</span>
                       </div>
                     </button>
-                    <button 
-                      className={`p-4 border rounded-lg dark:border-[#2A3F3A] hover:bg-muted/50 dark:hover:bg-[#1A2E24] transition-colors ${selectedMethod === 'bank' ? 'bg-muted/30 dark:bg-[#1A2E24] ring-2 ring-blue-500' : ''}`}
-                      onClick={() => handleMethodSelect('bank')}
-                    >
-                      <div className="flex flex-col items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-1 dark:text-[#F2F2F2]">
-                          <rect x="2" y="4" width="20" height="16" rx="2"></rect>
-                          <path d="M2 10h20"></path>
-                          <path d="M2 14h20"></path>
-                          <path d="M6 18h2"></path>
-                          <path d="M12 18h6"></path>
-                        </svg>
-                        <span className="dark:text-[#F2F2F2]">Bank Transfer</span>
-                      </div>
-                    </button>
+                    {bankDetailsVisible && (
+                      <button 
+                        className={`p-4 border rounded-lg dark:border-[#2A3F3A] hover:bg-muted/50 dark:hover:bg-[#1A2E24] transition-colors ${selectedMethod === 'bank' ? 'bg-muted/30 dark:bg-[#1A2E24] ring-2 ring-blue-500' : ''}`}
+                        onClick={() => handleMethodSelect('bank')}
+                      >
+                        <div className="flex flex-col items-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-1 dark:text-[#F2F2F2]">
+                            <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+                            <path d="M2 10h20"></path>
+                            <path d="M2 14h20"></path>
+                            <path d="M6 18h2"></path>
+                            <path d="M12 18h6"></path>
+                          </svg>
+                          <span className="dark:text-[#F2F2F2]">Bank Transfer</span>
+                        </div>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

@@ -45,6 +45,11 @@ import {
   getUserTransactions
 } from "../controllers/transaction.controller.js";
 
+import {
+  getBankDetailsVisibility,
+  updateBankDetailsVisibility
+} from "../controllers/settings.controller.js";
+
 // =============================================================================
 // USER MANAGEMENT ROUTES
 // =============================================================================
@@ -134,6 +139,14 @@ router.route("/add-upi").post(veriftyJWT, isAdmin, addUpi);
 router.route("/delete-upi/:id").delete(veriftyJWT, isAdmin, deleteUpiById);
 // Fallback route for body-based requests (backward compatibility)
 router.route("/delete-upi").delete(veriftyJWT, isAdmin, deleteUpiById);
+
+// =============================================================================
+// SETTINGS MANAGEMENT ROUTES
+// =============================================================================
+
+// Bank Details Visibility Settings
+router.route("/get-bank-details-visibility").get(veriftyJWT, isAdmin, getBankDetailsVisibility);
+router.route("/update-bank-details-visibility").post(veriftyJWT, isAdmin, updateBankDetailsVisibility);
 
 // =============================================================================
 // FUTURE ROUTES (COMMENTED FOR POTENTIAL USE)

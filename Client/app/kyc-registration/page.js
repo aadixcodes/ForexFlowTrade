@@ -39,6 +39,7 @@ const KycRegistration = () => {
     aadharPhoto: null,
     panPhoto: null,
     userPhoto: null,
+    passbookPhoto: null,
     
     // Bank Details
     bankName: '',
@@ -73,6 +74,7 @@ const KycRegistration = () => {
       if (!formData.aadharPhoto) newErrors.aadharPhoto = 'Aadhar photo is required';
       if (!formData.panPhoto) newErrors.panPhoto = 'PAN photo is required';
       if (!formData.userPhoto) newErrors.userPhoto = 'User photo is required';
+      if (!formData.passbookPhoto) newErrors.passbookPhoto = 'Passbook photo is required';
       if (!formData.nomineeName.trim()) newErrors.nomineeName = 'Nominee name is required';
       if (!formData.nomineeRelation.trim()) newErrors.nomineeRelation = 'Nominee relation is required';
       if (!formData.nomineeDob) newErrors.nomineeDob = 'Nominee date of birth is required';
@@ -146,6 +148,7 @@ const KycRegistration = () => {
         if (formData.aadharPhoto) submitData.append('aadharPhoto', formData.aadharPhoto);
         if (formData.panPhoto) submitData.append('panPhoto', formData.panPhoto);
         if (formData.userPhoto) submitData.append('userPhoto', formData.userPhoto);
+        if (formData.passbookPhoto) submitData.append('passbookPhoto', formData.passbookPhoto);
         
         console.log("Submitting registration data...");
         
@@ -424,7 +427,7 @@ const KycRegistration = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[#0E1F1B] text-sm mb-1">Aadhar Card Photo</label>
                     <label className="flex flex-col items-center justify-center h-28 border-2 border-dashed border-[#D0E2D2] rounded-xl cursor-pointer hover:bg-[#D0E2D2]/10">
@@ -464,7 +467,7 @@ const KycRegistration = () => {
                   </div>
 
                   <div>
-                    <label className="block text-[#0E1F1B] text-sm mb-1">Your Photo</label>
+                    <label className="block text-[#0E1F1B] text-sm mb-1">Passport Size Photo</label>
                     <label className="flex flex-col items-center justify-center h-28 border-2 border-dashed border-[#D0E2D2] rounded-xl cursor-pointer hover:bg-[#D0E2D2]/10">
                       <Upload className="h-5 w-5 text-[#43B852] mb-1" />
                       <span className="text-xs text-center text-[#0E1F1B]">
@@ -480,6 +483,25 @@ const KycRegistration = () => {
                       />
                     </label>
                     {errors.userPhoto && <p className="text-red-500 text-xs mt-1">{errors.userPhoto}</p>}
+                  </div>
+
+                  <div>
+                    <label className="block text-[#0E1F1B] text-sm mb-1">Passbook Photo</label>
+                    <label className="flex flex-col items-center justify-center h-28 border-2 border-dashed border-[#D0E2D2] rounded-xl cursor-pointer hover:bg-[#D0E2D2]/10">
+                      <Upload className="h-5 w-5 text-[#43B852] mb-1" />
+                      <span className="text-xs text-center text-[#0E1F1B]">
+                        {formData.passbookPhoto ? formData.passbookPhoto.name : 'Upload Passbook'}
+                      </span>
+                      <input
+                        type="file"
+                        name="passbookPhoto"
+                        onChange={handleChange}
+                        className="hidden"
+                        accept="image/*"
+                        required
+                      />
+                    </label>
+                    {errors.passbookPhoto && <p className="text-red-500 text-xs mt-1">{errors.passbookPhoto}</p>}
                   </div>
                 </div>
 
@@ -540,7 +562,7 @@ const KycRegistration = () => {
                     type="button"
                     onClick={nextStep}
                     className="bg-[#43B852] hover:bg-[#0E1F1B] text-white py-2 px-6 rounded-xl flex items-center disabled:opacity-50"
-                    disabled={!formData.aadharNo || !formData.pan || !formData.aadharPhoto || !formData.panPhoto || !formData.userPhoto || !formData.nomineeName || !formData.nomineeRelation || !formData.nomineeDob}
+                    disabled={!formData.aadharNo || !formData.pan || !formData.aadharPhoto || !formData.panPhoto || !formData.userPhoto || !formData.passbookPhoto || !formData.nomineeName || !formData.nomineeRelation || !formData.nomineeDob}
                   >
                     Next <ChevronRight className="ml-1 h-5 w-5" />
                   </button>

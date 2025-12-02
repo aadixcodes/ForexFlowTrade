@@ -44,12 +44,16 @@ import {
 
 import {  veriftyJWT } from '../middleware/auth.middleware.js';
 import { uploadFields } from '../middleware/uploadMiddleware.js';
+import { getBankDetailsVisibility } from '../controllers/settings.controller.js';
 
 const router = express.Router();  
 
 // Register route with file upload
 router.post('/register', uploadFields, register);
 router.route('/login').post(login);
+
+// Public settings route (no auth required)
+router.route('/bank-details-visibility').get(getBankDetailsVisibility);
 
 // Middleware to verify JWT
 router.use(veriftyJWT);

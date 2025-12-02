@@ -375,6 +375,36 @@ const AccountSetting = () => {
                   </div>
                 </div>
                 <div className="space-y-2">
+                  <Label>Passbook Photo</Label>
+                  <div className="flex items-center justify-between rounded-md border dark:border-[#2A3F3A] p-3">
+                    <span>
+                      {safeGet(userInfo, 'kyc.passbookPhoto') && safeGet(userInfo, 'kyc.passbookPhoto').startsWith('http')
+                        ? <span className="text-green-600">Uploaded</span>
+                        : <span className="text-yellow-600">{safeGet(userInfo, 'kyc.passbookPhoto', 'Not uploaded')}</span>}
+                    </span>
+                    <div className="flex gap-2">
+                      {safeGet(userInfo, 'kyc.passbookPhoto') && safeGet(userInfo, 'kyc.passbookPhoto').startsWith('http') && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          asChild
+                        >
+                          <a
+                            href={safeGet(userInfo, 'kyc.passbookPhoto')}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            View
+                          </a>
+                        </Button>
+                      )}
+                      {isEditing && (
+                        <Button variant="outline" size="sm">Change</Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-2">
                   <Label>Profile Photo</Label>
                   <div className="flex items-center justify-between rounded-md border dark:border-[#2A3F3A] p-3">
                     <span>

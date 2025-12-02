@@ -223,6 +223,7 @@ const TradesOrderHistory = () => {
   const [error, setError] = useState(null);
   const [hasData, setHasData] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
+  const [livePrices, setLivePrices] = useState({}); // Store live prices for each trade
 
   // Filter options - matching your backend enum values
   const filters = ['All', 'Pending', 'Open', 'Closed', 'Pending_Sell'];
@@ -270,7 +271,9 @@ const TradesOrderHistory = () => {
           (trade.profitLoss >= 0 ? `+$${Math.abs(trade.profitLoss).toFixed(2)}` : `-$${Math.abs(trade.profitLoss).toFixed(2)}`) 
           : '$0.00',
         status: trade.status ? trade.status.toLowerCase() : 'unknown',
-        tradeAmount: trade.tradeAmount || 0
+        tradeAmount: trade.tradeAmount || 0,
+        priceRange: trade.priceRange || null,
+        currentPrice: trade.currentPrice || null
       }));
 
       setTradingHistory(transformedTrades);
@@ -281,9 +284,7 @@ const TradesOrderHistory = () => {
       // Better error handling based on axios error structure
       let errorMessage = 'Failed to fetch order history';
       
-      if (isRateLimit(err)) {
-        errorMessage = formatError(err, 'fetching order history');
-      } else if (err.response) {
+      if (err.response) {
         // Server responded with error status
         errorMessage = err.response.data?.message || `Server error: ${err.response.status}`;
       } else if (err.request) {
@@ -307,6 +308,62 @@ const TradesOrderHistory = () => {
       setLoading(false);
     }
   };
+
+  // Generate random price between low and high range
+  const generateRandomPrice = (trade) => {
+    if (!trade.priceRange || trade.priceRange.low === null || trade.priceRange.low === undefined || 
+        trade.priceRange.high === null || trade.priceRange.high === undefined) {
+      return null;
+    }
+
+    const low = Number(trade.priceRange.low);
+    const high = Number(trade.priceRange.high);
+    
+    if (isNaN(low) || isNaN(high) || !isFinite(low) || !isFinite(high)) {
+      return null;
+    }
+    
+    // Generate random number between low and high
+    const randomPrice = low + Math.random() * (high - low);
+    return Number(randomPrice.toFixed(2));
+  };
+
+  // Update live prices for open trades every 3 seconds
+  useEffect(() => {
+    const openTrades = tradingHistory.filter(trade => 
+      trade.status === 'open' && trade.priceRange && trade.priceRange.low && trade.priceRange.high
+    );
+
+    if (openTrades.length === 0) {
+      setLivePrices({});
+      return;
+    }
+
+    // Initialize prices for new trades
+    setLivePrices(prev => {
+      const updated = { ...prev };
+      openTrades.forEach(trade => {
+        if (!updated[trade.id]) {
+          // Start with a random price in the range
+          updated[trade.id] = generateRandomPrice(trade);
+        }
+      });
+      return updated;
+    });
+
+    const interval = setInterval(() => {
+      setLivePrices(prev => {
+        const updated = { ...prev };
+        openTrades.forEach(trade => {
+          // Generate new random price between low and high
+          updated[trade.id] = generateRandomPrice(trade);
+        });
+        return updated;
+      });
+    }, 3000); // Update every 3 seconds
+
+    return () => clearInterval(interval);
+  }, [tradingHistory]);
 
   // Load data on component mount and filter change
   useEffect(() => {
@@ -509,34 +566,171 @@ const TradesOrderHistory = () => {
                     </tr>
                   ))
                 ) : (
-                  tradingHistory.map((trade) => (
-                    <tr key={trade.id} className="border-b dark:border-[#2A3F3A] hover:bg-muted/50 transition-colors">
-                      <td className="px-2 py-1 sm:px-4 sm:py-2 text-xs sm:text-sm dark:text-[#F2F2F2] whitespace-nowrap">{trade.date}</td>
-                      <td className="px-2 py-1 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium dark:text-[#F2F2F2] whitespace-nowrap">{trade.symbol}</td>
-                      <td className="px-2 py-1 sm:px-4 sm:py-2 text-xs sm:text-sm dark:text-[#F2F2F2] whitespace-nowrap">{trade.quantity}</td>
-                      {/* <td className="px-2 py-1 sm:px-4 sm:py-2 text-xs sm:text-sm dark:text-[#F2F2F2] whitespace-nowrap">
-                        {trade.buyPrice ? `$${trade.buyPrice.toFixed(2)}` : '-'}
-                      </td> */}
-                      {/* <td className="px-2 py-1 sm:px-4 sm:py-2 text-xs sm:text-sm dark:text-[#F2F2F2] whitespace-nowrap">
-                        {trade.sellPrice ? `$${trade.sellPrice.toFixed(2)}` : '-'}
-                      </td> */}
-                      <td className="px-2 py-1 sm:px-4 sm:py-2 text-xs sm:text-sm dark:text-[#F2F2F2] whitespace-nowrap capitalize">{trade.type}</td>
-                      <td className="px-2 py-1 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium whitespace-nowrap">
-                        <span className={`${
-                          trade.profitLoss.startsWith('+') 
-                            ? 'text-green-500' 
-                            : trade.profitLoss.startsWith('-') 
-                              ? 'text-red-500' 
-                              : 'text-gray-500'
-                        }`}>
-                          {trade.profitLoss}
-                        </span>
-                      </td>
-                      <td className="px-2 py-1 sm:px-4 sm:py-2 text-xs sm:text-sm whitespace-nowrap">
-                        <StatusBadge status={trade.status} className="text-xs sm:text-sm" />
-                      </td>
-                    </tr>
-                  ))
+                  tradingHistory.map((trade) => {
+                    const isOpen = trade.status === 'open';
+                    
+                    // Initialize default values
+                    let displayValue = trade.profitLoss;
+                    let isProfit = false;
+                    let isLoss = false;
+                    let shouldShowPriceComparison = false;
+
+                    // For open trades, compare current total value with mid value (total buy amount)
+                    if (isOpen) {
+                      console.log(`\n[DEBUG] ===== Processing Trade ${trade.id} =====`);
+                      console.log(`[DEBUG] Trade Data:`, {
+                        id: trade.id,
+                        symbol: trade.symbol,
+                        quantity: trade.quantity,
+                        buyPrice: trade.buyPrice,
+                        priceRange: trade.priceRange,
+                        currentPrice: trade.currentPrice,
+                        livePrice: livePrices[trade.id]
+                      });
+                      
+                      // Calculate total buy amount = quantity * buyPrice (this is the mid value)
+                      const quantity = Number(trade.quantity) || 0;
+                      const buyPricePerUnit = Number(trade.buyPrice) || 0;
+                      const totalBuyAmount = quantity * buyPricePerUnit;
+                      
+                      console.log(`[DEBUG] Calculated values:`, {
+                        quantity,
+                        buyPricePerUnit,
+                        calculatedTotalBuyAmount: totalBuyAmount
+                      });
+                      
+                      // ALWAYS use calculated totalBuyAmount (quantity * buyPrice) as mid value
+                      // Do NOT use priceRange.mid as the backend sets it to buyPrice, not the total amount
+                      // The mid value should be: quantity * buyPrice = total amount invested
+                      const midValue = totalBuyAmount; // This is quantity * buyPrice = 10 * 100 = 1000
+                      
+                      console.log(`[DEBUG] Mid value:`, {
+                        priceRangeMid: trade.priceRange?.mid,
+                        calculatedTotalBuyAmount: totalBuyAmount,
+                        finalMidValue: midValue,
+                        note: 'Using calculated totalBuyAmount, NOT priceRange.mid'
+                      });
+                      
+                      if (midValue != null && midValue !== undefined) {
+                        const midTotalValue = Number(midValue);
+                        
+                        console.log(`[DEBUG] Mid total value (Number):`, midTotalValue);
+                        console.log(`[DEBUG] Is valid number?`, !isNaN(midTotalValue) && isFinite(midTotalValue));
+                        
+                        if (!isNaN(midTotalValue) && isFinite(midTotalValue)) {
+                          // Get current total value - the live price is already the total value (generated between low and high range)
+                          // Prefer live price, then currentPrice from trade, fallback to midValue
+                          let currentTotalValue = null;
+                          let priceSource = 'none';
+                          
+                          // Check if livePrice exists in the livePrices object (this is already total value, not per unit)
+                          if (trade.id in livePrices && livePrices[trade.id] != null && livePrices[trade.id] !== undefined) {
+                            currentTotalValue = Number(livePrices[trade.id]);
+                            priceSource = 'livePrices';
+                          } else if (trade.currentPrice != null && trade.currentPrice !== undefined) {
+                            currentTotalValue = Number(trade.currentPrice);
+                            priceSource = 'trade.currentPrice';
+                          } else {
+                            // If no current price available yet, use midValue (neutral state)
+                            currentTotalValue = midTotalValue;
+                            priceSource = 'midValue (fallback)';
+                          }
+                          
+                          console.log(`[DEBUG] Current total value:`, {
+                            value: currentTotalValue,
+                            source: priceSource,
+                            isValid: currentTotalValue != null && !isNaN(currentTotalValue) && isFinite(currentTotalValue)
+                          });
+                          
+                          // Compare: current total value vs mid value (total buy amount)
+                          if (currentTotalValue != null && !isNaN(currentTotalValue) && isFinite(currentTotalValue)) {
+                            shouldShowPriceComparison = true;
+                            
+                            console.log(`[DEBUG] Comparison:`, {
+                              currentTotalValue,
+                              midTotalValue,
+                              difference: currentTotalValue - midTotalValue,
+                              isLess: currentTotalValue < midTotalValue,
+                              isGreater: currentTotalValue > midTotalValue,
+                              isEqual: currentTotalValue === midTotalValue
+                            });
+                            
+                            // If current total < mid value = LOSS (red with down arrow ↓)
+                            // If current total > mid value = PROFIT (green with up arrow ↑)
+                            // If current total = mid value = NEUTRAL (gray with =)
+                            if (currentTotalValue < midTotalValue) {
+                              isLoss = true;
+                              isProfit = false;
+                              displayValue = `$${currentTotalValue.toFixed(2)}`;
+                              console.log(`[DEBUG] ✅ RESULT: LOSS (RED) - Current: $${currentTotalValue}, Mid: $${midTotalValue}`);
+                            } else if (currentTotalValue > midTotalValue) {
+                              isProfit = true;
+                              isLoss = false;
+                              displayValue = `$${currentTotalValue.toFixed(2)}`;
+                              console.log(`[DEBUG] ✅ RESULT: PROFIT (GREEN) - Current: $${currentTotalValue}, Mid: $${midTotalValue}`);
+                            } else {
+                              isProfit = false;
+                              isLoss = false;
+                              displayValue = `$${currentTotalValue.toFixed(2)}`;
+                              console.log(`[DEBUG] ✅ RESULT: NEUTRAL (GRAY) - Current: $${currentTotalValue}, Mid: $${midTotalValue}`);
+                            }
+                            
+                            console.log(`[DEBUG] Final flags:`, {
+                              shouldShowPriceComparison,
+                              isLoss,
+                              isProfit,
+                              displayValue
+                            });
+                          } else {
+                            console.log(`[DEBUG] ❌ Current total value is invalid`);
+                          }
+                        } else {
+                          console.log(`[DEBUG] ❌ Mid total value is invalid`);
+                        }
+                      } else {
+                        console.log(`[DEBUG] ❌ Mid value is null or undefined`);
+                      }
+                      console.log(`[DEBUG] ===== End Trade ${trade.id} =====\n`);
+                    }
+
+                    return (
+                      <tr key={trade.id} className="border-b dark:border-[#2A3F3A] hover:bg-muted/50 transition-colors">
+                        <td className="px-2 py-1 sm:px-4 sm:py-2 text-xs sm:text-sm dark:text-[#F2F2F2] whitespace-nowrap">{trade.date}</td>
+                        <td className="px-2 py-1 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium dark:text-[#F2F2F2] whitespace-nowrap">{trade.symbol}</td>
+                        <td className="px-2 py-1 sm:px-4 sm:py-2 text-xs sm:text-sm dark:text-[#F2F2F2] whitespace-nowrap">{trade.quantity}</td>
+                        <td className="px-2 py-1 sm:px-4 sm:py-2 text-xs sm:text-sm dark:text-[#F2F2F2] whitespace-nowrap capitalize">{trade.type}</td>
+                        <td className="px-2 py-1 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium whitespace-nowrap">
+                          {shouldShowPriceComparison ? (
+                            <span className={`font-semibold ${
+                              isLoss 
+                                ? 'text-red-500 dark:text-red-400' 
+                                : isProfit 
+                                  ? 'text-green-500 dark:text-green-400' 
+                                  : 'text-gray-500 dark:text-gray-400'
+                            }`}>
+                              {displayValue}
+                              <span className="ml-1 text-xs">
+                                {isLoss ? '↓' : isProfit ? '↑' : '='}
+                              </span>
+                            </span>
+                          ) : (
+                            <span className={`${
+                              trade.profitLoss && trade.profitLoss.startsWith('+') 
+                                ? 'text-green-500 dark:text-green-400' 
+                                : trade.profitLoss && trade.profitLoss.startsWith('-') 
+                                  ? 'text-red-500 dark:text-red-400' 
+                                  : 'text-gray-500 dark:text-gray-400'
+                            }`}>
+                              {trade.profitLoss}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-2 py-1 sm:px-4 sm:py-2 text-xs sm:text-sm whitespace-nowrap">
+                          <StatusBadge status={trade.status} className="text-xs sm:text-sm" />
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

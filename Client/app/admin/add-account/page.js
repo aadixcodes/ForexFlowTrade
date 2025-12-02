@@ -3,12 +3,14 @@
 import React, { useState, useEffect } from 'react';
 import { PlusCircle, Edit, CheckCircle, XCircle, Banknote, CreditCard } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import api from '../../../utils/axios';
 
 const AddAccount = () => {
   const [loading, setLoading] = useState(true);
@@ -25,8 +27,25 @@ const AddAccount = () => {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [accountToEdit, setAccountToEdit] = useState(null);
   const [isFormDirty, setIsFormDirty] = useState(false);
+  const [showBankDetails, setShowBankDetails] = useState(true);
+  const [loadingSetting, setLoadingSetting] = useState(true);
 
   useEffect(() => {
+    // Fetch bank details visibility setting
+    const fetchBankDetailsSetting = async () => {
+      try {
+        const response = await api.get('/admin/get-bank-details-visibility');
+        // Handle ApiResponse format (statusCode, success, data)
+        if (response.data.success === true || response.data.statusCode === 200) {
+          setShowBankDetails(response.data.data?.showBankDetails ?? true);
+        }
+      } catch (error) {
+        console.error('Failed to fetch bank details visibility setting:', error);
+      } finally {
+        setLoadingSetting(false);
+      }
+    };
+
     // Simulate API fetch
     const fetchData = async () => {
       await new Promise(resolve => setTimeout(resolve, 1500));
@@ -62,7 +81,35 @@ const AddAccount = () => {
     };
 
     fetchData();
+    fetchBankDetailsSetting();
   }, []);
+
+  const handleToggleBankDetails = async (checked) => {
+    // Optimistically update the UI
+    const previousValue = showBankDetails;
+    setShowBankDetails(checked);
+    
+    try {
+      const response = await api.post('/admin/update-bank-details-visibility', {
+        showBankDetails: checked
+      });
+      // Handle ApiResponse format (statusCode, success, data)
+      if (response.data.success === true || response.data.statusCode === 200) {
+        // State already updated optimistically, just confirm
+        console.log('Bank details visibility updated successfully');
+      } else {
+        // Revert on unexpected response
+        setShowBankDetails(previousValue);
+        alert('Failed to update setting. Please try again.');
+      }
+    } catch (error) {
+      console.error('Failed to update bank details visibility setting:', error);
+      // Revert on error
+      setShowBankDetails(previousValue);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to update setting. Please try again.';
+      alert(errorMessage);
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -319,7 +366,29 @@ const AddAccount = () => {
               </div>
             </div>
             
-            <div className="mt-6 flex justify-end">
+            {/* Bank Details Visibility Toggle */}
+            <div className="mt-6 p-4 bg-white dark:bg-[#142924] rounded-lg border dark:border-[#2A3F3A]">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <h4 className="font-medium text-sm dark:text-[#F2F2F2] mb-1">Show Bank Details to Users</h4>
+                  <p className="text-xs text-muted-foreground dark:text-[#ABBAB6]">
+                    {showBankDetails 
+                      ? 'Users will see both UPI and Bank Transfer options during deposit'
+                      : 'Users will only see UPI option during deposit'}
+                  </p>
+                </div>
+                {loadingSetting ? (
+                  <Skeleton className="h-6 w-11 rounded-full" />
+                ) : (
+                  <Switch
+                    checked={showBankDetails}
+                    onCheckedChange={handleToggleBankDetails}
+                  />
+                )}
+              </div>
+            </div>
+            
+            <div className="mt-4 flex justify-end">
               <button
                 onClick={handleDeactivateAccount}
                 className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"

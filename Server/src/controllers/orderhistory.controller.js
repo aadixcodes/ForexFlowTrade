@@ -32,6 +32,8 @@ const getUserTradeHistory = async (req, res) => {
                 : '$0.00',
             status: trade.status.toLowerCase(),
             tradeAmount: trade.tradeAmount,
+            priceRange: trade.priceRange || null,
+            currentPrice: trade.currentPrice || null,
             createdAt: trade.createdAt,
             updatedAt: trade.updatedAt
         }));
@@ -51,7 +53,7 @@ const getUserTradeHistory = async (req, res) => {
 
 const createTrade = async (req, res) => {
     try {
-        const { userId, symbol, tradeType, quantity, buyPrice } = req.body;
+        const { userId, symbol, tradeType, quantity, buyPrice, priceRangeLow, priceRangeHigh } = req.body;
 
         // Validate required fields
         if (!userId || !symbol || !tradeType || !quantity || !buyPrice) {
@@ -62,14 +64,30 @@ const createTrade = async (req, res) => {
         }
 
         const tradeAmount = quantity * buyPrice;
+        const buyPriceNum = parseFloat(buyPrice);
+        
+        // Set mid to buyPrice, and handle range
+        const priceRange = {
+            low: priceRangeLow ? parseFloat(priceRangeLow) : null,
+            high: priceRangeHigh ? parseFloat(priceRangeHigh) : null,
+            mid: buyPriceNum // Mid is always the buy price
+        };
+
+        // Initialize currentPrice to mid (buyPrice) if range is provided
+        let currentPrice = null;
+        if (priceRange.low !== null && priceRange.high !== null) {
+            currentPrice = buyPriceNum;
+        }
 
         const newTrade = new OrderHistory({
             userId,
             symbol,
             type: tradeType.toUpperCase(),
             quantity: parseFloat(quantity),
-            buyPrice: parseFloat(buyPrice),
+            buyPrice: buyPriceNum,
             tradeAmount,
+            priceRange,
+            currentPrice,
             tradeDate: new Date(),
             status: 'OPEN'
         });
@@ -94,6 +112,34 @@ const updateTrade = async (req, res) => {
     try {
         const { tradeId } = req.params;
         const updateData = req.body;
+
+        // Handle price range updates
+        if (updateData.priceRangeLow !== undefined || updateData.priceRangeHigh !== undefined) {
+            const existingTrade = await OrderHistory.findById(tradeId);
+            if (!existingTrade) {
+                return res.status(404).json({
+                    status: "error",
+                    message: "Trade not found"
+                });
+            }
+
+            const buyPrice = updateData.buyPrice ? parseFloat(updateData.buyPrice) : existingTrade.buyPrice;
+            updateData.priceRange = {
+                low: updateData.priceRangeLow !== undefined ? parseFloat(updateData.priceRangeLow) : (existingTrade.priceRange?.low || null),
+                high: updateData.priceRangeHigh !== undefined ? parseFloat(updateData.priceRangeHigh) : (existingTrade.priceRange?.high || null),
+                mid: buyPrice // Mid is always the buy price
+            };
+
+            // Initialize currentPrice if range is provided and trade is open
+            if (updateData.priceRange.low !== null && updateData.priceRange.high !== null && 
+                (updateData.status === 'OPEN' || existingTrade.status === 'OPEN')) {
+                updateData.currentPrice = buyPrice;
+            }
+
+            // Remove the individual fields from updateData
+            delete updateData.priceRangeLow;
+            delete updateData.priceRangeHigh;
+        }
 
         // Calculate profit/loss if sellPrice is provided
         if (updateData.sellPrice && updateData.buyPrice && updateData.quantity) {

@@ -143,6 +143,25 @@ const UserDetailsPopup = ({ user, onClose, showImages = false, showForex = false
                   </button>
                 )}
               </div>
+              
+              {/* Passbook Photo */}
+              <div className="bg-gray-50 dark:bg-[#1E3730] p-4 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <FileText className="w-4 h-4 text-gray-500 dark:text-[#ABBAB6]" />
+                  <span className="text-sm text-gray-500 dark:text-[#ABBAB6]">Passbook {showImages ? 'Photo' : 'Number'}</span>
+                </div>
+                <p className="font-medium dark:text-[#F2F2F2]">
+                  {user.kycInfo.passbookPhoto ? 'Available' : 'Not provided'}
+                </p>
+                {showImages && user.kycInfo.passbookPhoto && (
+                  <button 
+                    onClick={() => setViewImage(user.kycInfo.passbookPhoto)}
+                    className="mt-2 text-sm text-blue-500 hover:text-blue-700 dark:hover:text-blue-400"
+                  >
+                    View Image
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 

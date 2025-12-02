@@ -292,7 +292,8 @@ const WithdrawRequest = () => {
             panNumber: userData.pan || 'Not provided',
             aadharPhoto: userData.aadharPhoto || '',
             panPhoto: userData.panPhoto || '',
-            profilePhoto: userData.userPhoto || ''
+            profilePhoto: userData.userPhoto || '',
+            passbookPhoto: userData.passbookPhoto || ''
           },
           bankDetails: {
             bankName: userData.bankName || 'Not provided',

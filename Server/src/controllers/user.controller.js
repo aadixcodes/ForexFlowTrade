@@ -153,27 +153,30 @@ const register = async (req, res) => {
         const aadharPhoto = Array.isArray(files.aadharPhoto) ? files.aadharPhoto[0] : files.aadharPhoto;
         const panPhoto = Array.isArray(files.panPhoto) ? files.panPhoto[0] : files.panPhoto;
         const userPhoto = Array.isArray(files.userPhoto) ? files.userPhoto[0] : files.userPhoto;
+        const passbookPhoto = Array.isArray(files.passbookPhoto) ? files.passbookPhoto[0] : files.passbookPhoto;
         
-        if (!aadharPhoto || !panPhoto || !userPhoto) {
+        if (!aadharPhoto || !panPhoto || !userPhoto || !passbookPhoto) {
             console.log("Missing files:", {
                 hasFiles: !!files,
                 hasAadhar: !!aadharPhoto,
                 hasPan: !!panPhoto,
                 hasUser: !!userPhoto,
+                hasPassbook: !!passbookPhoto,
                 fileKeys: files ? Object.keys(files) : []
             });
             return res.status(400).json({
                 status: "fail",
-                message: "Please upload all required documents (Aadhar, PAN, and User photo)"
+                message: "Please upload all required documents (Aadhar, PAN, User photo, and Passbook photo)"
             });
         }
         
         // Ensure files have path property (Cloudinary URL)
-        if (!aadharPhoto.path || !panPhoto.path || !userPhoto.path) {
+        if (!aadharPhoto.path || !panPhoto.path || !userPhoto.path || !passbookPhoto.path) {
             console.log("Files missing path property:", {
                 aadharPath: !!aadharPhoto?.path,
                 panPath: !!panPhoto?.path,
-                userPath: !!userPhoto?.path
+                userPath: !!userPhoto?.path,
+                passbookPath: !!passbookPhoto?.path
             });
             return res.status(400).json({
                 status: "fail",
@@ -231,6 +234,7 @@ const register = async (req, res) => {
         const aadharPhotoPath = aadharPhoto.path;
         const panPhotoPath = panPhoto.path;
         const userPhotoPath = userPhoto.path;
+        const passbookPhotoPath = passbookPhoto.path;
         
         console.log("Creating new user with data:", {
             name: `${firstName} ${lastName}`,
@@ -244,7 +248,8 @@ const register = async (req, res) => {
             ifscCode,
             aadharPhoto: aadharPhotoPath,
             panPhoto: panPhotoPath,
-            userPhoto: userPhotoPath
+            userPhoto: userPhotoPath,
+            passbookPhoto: passbookPhotoPath
         });
 
         // Create new user with generated password
@@ -270,6 +275,7 @@ const register = async (req, res) => {
             aadharPhoto: aadharPhotoPath,
             panPhoto: panPhotoPath,
             userPhoto: userPhotoPath,
+            passbookPhoto: passbookPhotoPath,
             isVerified: false // User starts as unverified
         });
 
@@ -607,7 +613,7 @@ const getProfile = async (req, res, next) => {
     const userId = req.user.id;
 
     const user = await User.findById(userId).select(
-      'name email phone aadharNo pan aadharPhoto panPhoto userPhoto bankName accountNumber accountHolder ifscCode lastLogin role status'
+      'name email phone aadharNo pan aadharPhoto panPhoto userPhoto passbookPhoto bankName accountNumber accountHolder ifscCode lastLogin role status'
     );
 
     if (!user) {
@@ -630,6 +636,7 @@ const getProfile = async (req, res, next) => {
         aadharPhoto: user.aadharPhoto,
         panPhoto: user.panPhoto,
         profilePhoto: user.userPhoto,
+        passbookPhoto: user.passbookPhoto,
       },
       bank: {
         name: user.bankName,
@@ -682,6 +689,7 @@ const updateProfile = async (req, res, next) => {
       user.aadharPhoto = kyc.aadharPhoto;
       user.panPhoto = kyc.panPhoto;
       user.userPhoto = kyc.profilePhoto;
+      if (kyc.passbookPhoto) user.passbookPhoto = kyc.passbookPhoto;
     }
     if (bank) {
       user.bankName = bank.name;
@@ -1558,7 +1566,7 @@ const getUserbyId = async (req, res) => {
             });
         }
 
-        const user = await User.findById(userId).select('name email phone aadharNo pan bankName accountNumber accountHolder ifscCode isVerified createdAt updatedAt aadharPhoto panPhoto userPhoto generatedPassword');
+        const user = await User.findById(userId).select('name email phone aadharNo pan bankName accountNumber accountHolder ifscCode isVerified createdAt updatedAt aadharPhoto panPhoto userPhoto passbookPhoto generatedPassword');
         if (!user) {
             return res.status(404).json({
                 status: "fail",

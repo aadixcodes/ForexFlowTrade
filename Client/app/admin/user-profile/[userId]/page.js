@@ -54,7 +54,8 @@ const UserProfile = () => {
               panNumber: userData.pan || 'Not provided',
               aadharPhoto: userData.aadharPhoto || '',
               panPhoto: userData.panPhoto || '',
-              profilePhoto: userData.userPhoto || ''
+              profilePhoto: userData.userPhoto || '',
+              passbookPhoto: userData.passbookPhoto || ''
             },
             bank: {
               name: userData.bankName || 'Not provided',
@@ -183,7 +184,7 @@ const UserProfile = () => {
             onClick={() => router.back()}
             className="p-2 rounded-md border dark:border-[#2A3F3A] hover:bg-muted"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-5 h-5 text-white" />
           </button>
           <h1 className="text-2xl font-bold dark:text-[#F2F2F2]">User Profile</h1>
         </div>
@@ -226,7 +227,7 @@ const UserProfile = () => {
           onClick={() => router.back()}
           className="p-2 rounded-md border dark:border-[#2A3F3A] hover:bg-muted"
         >
-          <ArrowLeft className="w-5 h-5" />
+          <ArrowLeft className="w-5 h-5 text-white" />
         </button>
         <h1 className="text-2xl font-bold dark:text-[#F2F2F2]">User Profile</h1>
       </div>
@@ -370,6 +371,16 @@ const UserProfile = () => {
                   <p className="text-sm text-muted-foreground dark:text-[#ABBAB6]">Pan Photo</p>
                   <p className="font-medium dark:text-[#F2F2F2]">
                     {user.kyc.panPhoto ? (
+                      <span className="text-green-500">Uploaded</span>
+                    ) : (
+                      <span className="text-gray-500">Not uploaded</span>
+                    )}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground dark:text-[#ABBAB6]">Passbook Photo</p>
+                  <p className="font-medium dark:text-[#F2F2F2]">
+                    {user.kyc.passbookPhoto ? (
                       <span className="text-green-500">Uploaded</span>
                     ) : (
                       <span className="text-gray-500">Not uploaded</span>

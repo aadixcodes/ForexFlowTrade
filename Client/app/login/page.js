@@ -165,14 +165,14 @@ const Login = () => {
             )}
             <form onSubmit={handleSubmit}>
               <div className="mb-3 md:mb-4">
-                <label htmlFor="username" className="block text-[#0E1F1B] text-sm md:text-base mb-1 md:mb-2">Username</label>
+                <label htmlFor="username" className="block text-[#0E1F1B] text-sm md:text-base mb-1 md:mb-2">Email</label>
                 <input
                   type="text"
                   id="username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="w-full bg-[#D0E2D2]/20 text-[#0E1F1B] px-3 py-2 md:px-4 md:py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#43B852] border border-[#D0E2D2] text-sm md:text-base"
-                  placeholder="Enter your username"
+                  placeholder="Enter your email"
                   required
                 />
               </div>

@@ -35,7 +35,9 @@ const TradesOrderHistory = () => {
     symbol: '',
     tradeType: 'long',
     quantity: '',
-    buyPrice: ''
+    buyPrice: '',
+    priceRangeLow: '',
+    priceRangeHigh: ''
   });
   const [toasts, setToasts] = useState([]);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -46,7 +48,9 @@ const TradesOrderHistory = () => {
     buyPrice: '',
     sellPrice: '',
     type: 'long',
-    status: 'open'
+    status: 'open',
+    priceRangeLow: '',
+    priceRangeHigh: ''
   });
 
   // Fetch all users on component mount
@@ -123,7 +127,9 @@ const TradesOrderHistory = () => {
         symbol: tradeData.symbol,
         tradeType: tradeData.tradeType,
         quantity: parseFloat(tradeData.quantity),
-        buyPrice: parseFloat(tradeData.buyPrice)
+        buyPrice: parseFloat(tradeData.buyPrice),
+        priceRangeLow: tradeData.priceRangeLow ? parseFloat(tradeData.priceRangeLow) : null,
+        priceRangeHigh: tradeData.priceRangeHigh ? parseFloat(tradeData.priceRangeHigh) : null
       };
 
       const response = await api.post('/admin/create-trade', tradePayload);
@@ -142,7 +148,9 @@ const TradesOrderHistory = () => {
           symbol: '',
           tradeType: 'long',
           quantity: '',
-          buyPrice: ''
+          buyPrice: '',
+          priceRangeLow: '',
+          priceRangeHigh: ''
         });
       }
     } catch (error) {
@@ -159,7 +167,9 @@ const TradesOrderHistory = () => {
       buyPrice: trade.buyPrice.toString(),
       sellPrice: trade.sellPrice ? trade.sellPrice.toString() : '',
       type: trade.type.toLowerCase(),
-      status: trade.status
+      status: trade.status,
+      priceRangeLow: trade.priceRange?.low ? trade.priceRange.low.toString() : '',
+      priceRangeHigh: trade.priceRange?.high ? trade.priceRange.high.toString() : ''
     });
     setShowEditModal(true);
   };
@@ -180,7 +190,9 @@ const TradesOrderHistory = () => {
         buyPrice: parseFloat(editFormData.buyPrice),
         sellPrice: editFormData.sellPrice ? parseFloat(editFormData.sellPrice) : null,
         type: editFormData.type.toUpperCase(),
-        status: editFormData.status.toUpperCase()
+        status: editFormData.status.toUpperCase(),
+        priceRangeLow: editFormData.priceRangeLow ? parseFloat(editFormData.priceRangeLow) : null,
+        priceRangeHigh: editFormData.priceRangeHigh ? parseFloat(editFormData.priceRangeHigh) : null
       };
 
       const response = await api.put(`/admin/update-trade/${currentTrade.id}`, updatePayload);
@@ -374,34 +386,34 @@ const TradesOrderHistory = () => {
 
       {/* Buy Trade Modal */}
       <Dialog open={showBuyTradeModal} onOpenChange={setShowBuyTradeModal}>
-        <DialogContent className="sm:max-w-[425px] dark:text-white transition-all duration-300 ease-in-out">
+        <DialogContent className="sm:max-w-[450px] p-6 dark:text-white transition-all duration-300 ease-in-out max-h-[80vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="dark:text-[#F2F2F2]">Buy Trade</DialogTitle>
             <DialogDescription className="dark:text-[#ABBAB6]">
               Create a new trade for {selectedUserName}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="user" className="text-right dark:text-[#F2F2F2]">
+          <div className="grid gap-4 py-4 overflow-y-auto flex-1 pr-2">
+            <div className="space-y-2">
+              <Label htmlFor="user" className="dark:text-[#F2F2F2]">
                 User
               </Label>
               <Input
                 id="user"
                 value={selectedUserName}
                 disabled
-                className="col-span-3 dark:text-white"
+                className="dark:text-white"
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4 dark:text-white">
-              <Label htmlFor="symbol" className="text-right dark:text-[#F2F2F2]">
+            <div className="space-y-2 dark:text-white">
+              <Label htmlFor="symbol" className="dark:text-[#F2F2F2]">
                 Symbol
               </Label>
               <Select
                 value={tradeData.symbol}
                 onValueChange={(value) => setTradeData({ ...tradeData, symbol: value })}
               >
-                <SelectTrigger className="col-span-3">
+                <SelectTrigger>
                   <SelectValue placeholder="Select a symbol" />
                 </SelectTrigger>
                 <SelectContent className="max-h-[300px] overflow-y-auto">
@@ -413,15 +425,15 @@ const TradesOrderHistory = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="tradeType" className="text-right dark:text-[#F2F2F2]">
+            <div className="space-y-2">
+              <Label htmlFor="tradeType" className="dark:text-[#F2F2F2]">
                 Trade Type
               </Label>
               <Select
                 value={tradeData.tradeType}
                 onValueChange={(value) => setTradeData({ ...tradeData, tradeType: value })}
               >
-                <SelectTrigger className="col-span-3">
+                <SelectTrigger>
                   <SelectValue placeholder="Select trade type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -430,8 +442,8 @@ const TradesOrderHistory = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="quantity" className="text-right dark:text-[#F2F2F2]">
+            <div className="space-y-2">
+              <Label htmlFor="quantity" className="dark:text-[#F2F2F2]">
                 Quantity
               </Label>
               <Input
@@ -440,11 +452,10 @@ const TradesOrderHistory = () => {
                 type="number"
                 value={tradeData.quantity}
                 onChange={handleInputChange}
-                className="col-span-3"
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="buyPrice" className="text-right dark:text-[#F2F2F2]">
+            <div className="space-y-2">
+              <Label htmlFor="buyPrice" className="dark:text-[#F2F2F2]">
                 Buy Price
               </Label>
               <Input
@@ -454,20 +465,48 @@ const TradesOrderHistory = () => {
                 step="0.01"
                 value={tradeData.buyPrice}
                 onChange={handleInputChange}
-                className="col-span-3"
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="total" className="text-right dark:text-[#F2F2F2]">
+            <div className="space-y-2">
+              <Label htmlFor="total" className="dark:text-[#F2F2F2]">
                 Total Amount
               </Label>
               <Input
                 id="total"
                 value={`$${calculateTotal()}`}
                 disabled
-                className="col-span-3 font-medium"
+                className="font-medium"
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="priceRangeLow" className="dark:text-[#F2F2F2]">
+                Price Range (Low)
+              </Label>
+              <Input
+                id="priceRangeLow"
+                name="priceRangeLow"
+                type="number"
+                step="0.01"
+                value={tradeData.priceRangeLow}
+                onChange={handleInputChange}
+                placeholder="Minimum price for simulation"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="priceRangeHigh" className="dark:text-[#F2F2F2]">
+                Price Range (High)
+              </Label>
+              <Input
+                id="priceRangeHigh"
+                name="priceRangeHigh"
+                type="number"
+                step="0.01"
+                value={tradeData.priceRangeHigh}
+                onChange={handleInputChange}
+                placeholder="Maximum price for simulation"
+              />
+            </div>
+            
           </div>
           <DialogFooter>
             <Button
@@ -516,23 +555,23 @@ const TradesOrderHistory = () => {
 
       {/* Edit Trade Modal */}
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
-        <DialogContent className="sm:max-w-[425px] dark:text-white transition-all duration-300 ease-in-out">
+        <DialogContent className="sm:max-w-[500px] dark:text-white transition-all duration-300 ease-in-out max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="dark:text-[#F2F2F2]">Edit Trade</DialogTitle>
             <DialogDescription className="dark:text-[#ABBAB6]">
               Edit trade details for {selectedUserName}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4 dark:text-white">
-              <Label htmlFor="edit-symbol" className="text-right dark:text-[#F2F2F2]">
+          <div className="grid gap-4 py-4 overflow-y-auto flex-1 pr-2">
+            <div className="space-y-2 dark:text-white">
+              <Label htmlFor="edit-symbol" className="dark:text-[#F2F2F2]">
                 Symbol
               </Label>
               <Select
                 value={editFormData.symbol}
                 onValueChange={(value) => setEditFormData({ ...editFormData, symbol: value })}
               >
-                <SelectTrigger className="col-span-3">
+                <SelectTrigger>
                   <SelectValue placeholder={editFormData.symbol || "Select a symbol"} />
                 </SelectTrigger>
                 <SelectContent className="max-h-[300px] overflow-y-auto">
@@ -544,8 +583,8 @@ const TradesOrderHistory = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-quantity" className="text-right dark:text-[#F2F2F2]">
+            <div className="space-y-2">
+              <Label htmlFor="edit-quantity" className="dark:text-[#F2F2F2]">
                 Quantity
               </Label>
               <Input
@@ -554,11 +593,10 @@ const TradesOrderHistory = () => {
                 type="number"
                 value={editFormData.quantity}
                 onChange={handleEditInputChange}
-                className="col-span-3"
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-buyPrice" className="text-right dark:text-[#F2F2F2]">
+            <div className="space-y-2">
+              <Label htmlFor="edit-buyPrice" className="dark:text-[#F2F2F2]">
                 Buy Price
               </Label>
               <Input
@@ -568,11 +606,10 @@ const TradesOrderHistory = () => {
                 step="0.01"
                 value={editFormData.buyPrice}
                 onChange={handleEditInputChange}
-                className="col-span-3"
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-sellPrice" className="text-right dark:text-[#F2F2F2]">
+            <div className="space-y-2">
+              <Label htmlFor="edit-sellPrice" className="dark:text-[#F2F2F2]">
                 Sell Price
               </Label>
               <Input
@@ -582,19 +619,18 @@ const TradesOrderHistory = () => {
                 step="0.01"
                 value={editFormData.sellPrice}
                 onChange={handleEditInputChange}
-                className="col-span-3"
                 placeholder="Leave empty if not sold"
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-type" className="text-right dark:text-[#F2F2F2]">
+            <div className="space-y-2">
+              <Label htmlFor="edit-type" className="dark:text-[#F2F2F2]">
                 Trade Type
               </Label>
               <Select
                 value={editFormData.type}
                 onValueChange={(value) => setEditFormData({ ...editFormData, type: value })}
               >
-                <SelectTrigger className="col-span-3">
+                <SelectTrigger>
                   <SelectValue placeholder="Select trade type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -603,15 +639,15 @@ const TradesOrderHistory = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-status" className="text-right dark:text-[#F2F2F2]">
+            <div className="space-y-2">
+              <Label htmlFor="edit-status" className="dark:text-[#F2F2F2]">
                 Status
               </Label>
               <Select
                 value={editFormData.status}
                 onValueChange={(value) => setEditFormData({ ...editFormData, status: value })}
               >
-                <SelectTrigger className="col-span-3">
+                <SelectTrigger>
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -620,6 +656,38 @@ const TradesOrderHistory = () => {
                   <SelectItem value="pending">Pending</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-priceRangeLow" className="dark:text-[#F2F2F2]">
+                Price Range (Low)
+              </Label>
+              <Input
+                id="edit-priceRangeLow"
+                name="priceRangeLow"
+                type="number"
+                step="0.01"
+                value={editFormData.priceRangeLow}
+                onChange={handleEditInputChange}
+                placeholder="Minimum price for simulation"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-priceRangeHigh" className="dark:text-[#F2F2F2]">
+                Price Range (High)
+              </Label>
+              <Input
+                id="edit-priceRangeHigh"
+                name="priceRangeHigh"
+                type="number"
+                step="0.01"
+                value={editFormData.priceRangeHigh}
+                onChange={handleEditInputChange}
+                placeholder="Maximum price for simulation"
+              />
+            </div>
+            <div className="text-xs text-muted-foreground dark:text-[#ABBAB6] space-y-1 pt-2">
+              <p>• Mid value will be automatically set to Buy Price</p>
+              <p>• Users will see a live price fluctuating between Low and High for open trades</p>
             </div>
           </div>
           <DialogFooter>

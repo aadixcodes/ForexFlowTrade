@@ -642,7 +642,8 @@ const Dashboard = () => {
               aadharNumber: userData.aadharNo || 'N/A',
               panNumber: userData.pan || 'N/A',
               aadharPhoto: userData.aadharPhoto || '',
-              panPhoto: userData.panPhoto || ''
+              panPhoto: userData.panPhoto || '',
+              passbookPhoto: userData.passbookPhoto || ''
             },
             bankDetails: {
               bankName: userData.bankName || 'N/A',
@@ -737,7 +738,8 @@ const Dashboard = () => {
               aadharNumber: userData.aadharNo || 'N/A',
               panNumber: userData.pan || 'N/A',
               aadharPhoto: userData.aadharPhoto || '',
-              panPhoto: userData.panPhoto || ''
+              panPhoto: userData.panPhoto || '',
+              passbookPhoto: userData.passbookPhoto || ''
             },
             bankDetails: {
               bankName: userData.bankName || 'N/A',

@@ -50,7 +50,8 @@ const uploadFields = (req, res, next) => {
   const multerMiddleware = upload.fields([
     { name: 'aadharPhoto', maxCount: 1 },
     { name: 'panPhoto', maxCount: 1 },
-    { name: 'userPhoto', maxCount: 1 }
+    { name: 'userPhoto', maxCount: 1 },
+    { name: 'passbookPhoto', maxCount: 1 }
   ]);
   
   // Wrap multer middleware with error handling

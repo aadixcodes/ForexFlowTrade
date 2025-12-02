@@ -52,6 +52,25 @@ const OrderHistorySchema = new Schema({
     type: Number,
     required: true
   },
+  // Range fields for live price simulation
+  priceRange: {
+    low: {
+      type: Number,
+      default: null
+    },
+    high: {
+      type: Number,
+      default: null
+    },
+    mid: {
+      type: Number,
+      default: null
+    }
+  },
+  currentPrice: {
+    type: Number,
+    default: null
+  },
   createdAt: {
     type: Date,
     default: Date.now
