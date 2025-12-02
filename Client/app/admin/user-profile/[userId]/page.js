@@ -39,6 +39,7 @@ const UserProfile = () => {
             username: `@${(userData.email || 'user').split('@')[0]}`,
             phone: userData.phone || 'Not provided',
             email: userData.email || 'Not provided',
+            generatedPassword: userData.generatedPassword || 'Not generated yet',
             status: userData.isVerified ? 'verified' : 'pending',
             joinedDate: userData.createdAt 
               ? new Date(userData.createdAt).toLocaleDateString('en-US', { 
@@ -266,6 +267,10 @@ const UserProfile = () => {
                 <p className='dark:text-[#F2F2F2] text-sm'>{user.phone}</p>
               </div>
               <div>
+                <p className="text-sm text-muted-foreground dark:text-[#ABBAB6]">Generated Password</p>
+                <p className='dark:text-[#F2F2F2] text-sm font-mono'>{user.generatedPassword}</p>
+              </div>
+              <div>
                 <p className="text-sm text-muted-foreground dark:text-[#ABBAB6]">Joined</p>
                 <p className='dark:text-[#F2F2F2] text-sm'>{user.joinedDate}</p>
               </div>
@@ -316,6 +321,10 @@ const UserProfile = () => {
                 <div>
                   <p className="text-sm text-muted-foreground dark:text-[#ABBAB6]">Email</p>
                   <p className="font-medium dark:text-[#F2F2F2]">{user.email}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground dark:text-[#ABBAB6]">Generated Password</p>
+                  <p className="font-medium dark:text-[#F2F2F2] font-mono">{user.generatedPassword}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground dark:text-[#ABBAB6]">Status</p>

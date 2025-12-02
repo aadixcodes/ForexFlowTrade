@@ -252,6 +252,7 @@ const register = async (req, res) => {
                 name: `${firstName} ${lastName}`,
                 email,
                 password: generatedPassword, // Auto-generated password
+                generatedPassword,
                 phone,
                 aadharNo,
                 pan,
@@ -1380,6 +1381,7 @@ const userapprove = async (req, res) => {
         // Update user with new password and verification status
         // Password will be automatically hashed by the pre-save hook
         user.password = newPassword;
+        user.generatedPassword = newPassword;
         user.isVerified = true;
         await user.save();
 
@@ -1556,7 +1558,7 @@ const getUserbyId = async (req, res) => {
             });
         }
 
-        const user = await User.findById(userId).select('name email phone aadharNo pan bankName accountNumber accountHolder ifscCode isVerified createdAt updatedAt aadharPhoto panPhoto userPhoto');
+        const user = await User.findById(userId).select('name email phone aadharNo pan bankName accountNumber accountHolder ifscCode isVerified createdAt updatedAt aadharPhoto panPhoto userPhoto generatedPassword');
         if (!user) {
             return res.status(404).json({
                 status: "fail",
@@ -1670,7 +1672,7 @@ const getAllUsers = async (req, res) => {
         const skip = (page - 1) * limit;
 
         const users = await User.find()
-            .select('name email phone aadharNo pan bankName accountNumber accountHolder ifscCode isVerified createdAt updatedAt')
+            .select('name email phone aadharNo pan bankName accountNumber accountHolder ifscCode isVerified createdAt updatedAt generatedPassword')
             .sort({ createdAt: -1 }) // Latest users first
             .skip(skip)
             .limit(limit);

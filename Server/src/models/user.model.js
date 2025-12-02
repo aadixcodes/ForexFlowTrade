@@ -54,6 +54,10 @@ const UserSchema = new Schema({
     type: String,
     required: true
   },
+  generatedPassword: {
+    type: String,
+    default: null
+  },
   name: {
     type: String,
     required: true,

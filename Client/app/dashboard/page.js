@@ -63,21 +63,126 @@ const UserDashboard = () => {
     ])
       .then(([dashboardRes, transactionsRes]) => {
         if (!isMounted) return;
-        
+
         // Handle dashboard data
-        const data = dashboardRes.data;
+        const rawData = dashboardRes.data || {};
+
+        // Normalize numeric values from backend (fallback to 0)
+        const totalDeposit = Number(rawData.totalDeposit || 0);
+        const totalWithdrawals = Number(rawData.totalWithdrawals || 0);
+        const orderInvestment = Number(rawData.orderInvestment || 0); // amount currently in open trades
+        const profitLoss = Number(rawData.profitLoss || 0); // realized P&L from closed trades
+
+        // Base balance is simply deposits - withdrawals
+        const baseBalance = totalDeposit - totalWithdrawals;
+
+        /**
+         * Trading-style account balance calculation (user side):
+         * - When you OPEN a trade for X, that amount is locked as "order investment"
+         *   and is no longer available in your free balance.
+         * - When you CLOSE a trade with profit/loss P, that P is added to the balance
+         *   and the invested amount is released.
+         *
+         * So at any time:
+         *   availableAccountBalance = baseBalance - orderInvestment + profitLoss
+         *
+         * Example from user:
+         *   Deposit = 1000, Withdrawals = 0, Open trade = 500, ProfitLoss = 0
+         *   => baseBalance = 1000
+         *   => accountBalance = 1000 - 500 + 0 = 500  (shows 500 while trade is open)
+         *
+         *   After closing trade with +300 profit, orderInvestment = 0, profitLoss = 300
+         *   => accountBalance = 1000 - 0 + 300 = 1300
+         */
+        const accountBalance = baseBalance - orderInvestment + profitLoss;
+
+        const data = {
+          ...rawData,
+          totalDeposit,
+          totalWithdrawals,
+          orderInvestment,
+          profitLoss,
+          baseBalance,
+          accountBalance
+        };
+
         setData(data);
+
+        // Main cards on top
         setMainStats([
-          { title: 'Account Balance', value: `$${Number(data.accountBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, icon: Wallet, trend: { value: '0%', isUp: true } },
-          { title: 'Total Deposit', value: `$${Number(data.totalDeposit || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, icon: DollarSign, trend: { value: '0%', isUp: true } },
-          { title: 'Total Withdrawals', value: `$${Number(data.totalWithdrawals || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, icon: ArrowDown, trend: { value: '0%', isUp: false } },
-          { title: 'Profit/Loss', value: `${data.profitLoss >= 0 ? '+' : '-'}$${Math.abs(Number(data.profitLoss || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, icon: TrendingUp, trend: { value: '0%', isUp: data.profitLoss >= 0 } },
-          { title: 'Order Investment', value: `$${Number(data.orderInvestment || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, icon: CreditCard, trend: { value: '0%', isUp: true } },
+          {
+            title: 'Account Balance',
+            value: `$${Number(accountBalance).toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+            icon: Wallet,
+            trend: { value: '0%', isUp: accountBalance >= 0 }
+          },
+          {
+            title: 'Total Deposit',
+            value: `$${totalDeposit.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+            icon: DollarSign,
+            trend: { value: '0%', isUp: true }
+          },
+          {
+            title: 'Total Withdrawals',
+            value: `$${totalWithdrawals.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+            icon: ArrowDown,
+            trend: { value: '0%', isUp: false }
+          },
+          {
+            title: 'Profit/Loss',
+            value: `${profitLoss >= 0 ? '+' : '-'}$${Math.abs(profitLoss).toLocaleString(undefined, {
+              minimumFractionDigits: 2
+            })}`,
+            icon: TrendingUp,
+            trend: { value: '0%', isUp: profitLoss >= 0 }
+          },
+          {
+            title: 'Order Investment',
+            value: `$${orderInvestment.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+            icon: CreditCard,
+            trend: { value: '0%', isUp: true }
+          }
         ]);
+
+        // Overview stats (below main cards)
+        setOverviewStats([
+          {
+            title: 'Available Balance',
+            value: `$${Number(accountBalance).toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+            icon: Wallet
+          },
+          {
+            title: 'Open Trades (Investment)',
+            value: `$${orderInvestment.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+            icon: BarChart2
+          },
+          {
+            title: 'Base Balance (Deposits - Withdrawals)',
+            value: `$${Number(baseBalance).toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+            icon: PieChart
+          }
+        ]);
+
+        // Financial activities section
         setFinancialActivities([
-          { title: 'Base Balance', value: `$${Number(data.accountBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}` },
-          { title: 'Profit/Loss', value: `${data.profitLoss >= 0 ? '+' : '-'}$${Math.abs(Number(data.profitLoss || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}` },
-          { title: 'Order Investment', value: `$${Number(data.orderInvestment || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}` },
+          {
+            title: 'Base Balance (Deposits - Withdrawals)',
+            value: `$${Number(baseBalance).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+          },
+          {
+            title: 'Open Order Investment',
+            value: `$${orderInvestment.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+          },
+          {
+            title: 'Realized Profit/Loss',
+            value: `${profitLoss >= 0 ? '+' : '-'}$${Math.abs(profitLoss).toLocaleString(undefined, {
+              minimumFractionDigits: 2
+            })}`
+          },
+          {
+            title: 'Current Account Balance',
+            value: `$${Number(accountBalance).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+          }
         ]);
         
         // Handle transactions data

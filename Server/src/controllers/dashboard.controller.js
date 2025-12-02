@@ -20,22 +20,45 @@ export const getUserDashboardData = async (req, res) => {
     ]);
     const withdrawals = totalWithdrawals[0]?.total || 0;
 
-    // Account Balance
-    const accountBalance = deposit - withdrawals;
+    // Base Account Balance (Deposits - Withdrawals)
+    const baseBalance = deposit - withdrawals;
 
-    // Order Investment
+    /**
+     * Trading-style metrics for user dashboard
+     *
+     * - orderInvestment: sum of tradeAmount for all OPEN trades
+     *   (capital currently locked in active positions)
+     * - profitLoss: sum of profitLoss for all CLOSED trades
+     *   (realized P&L only)
+     * - accountBalance (available funds):
+     *     baseBalance - orderInvestment + profitLoss
+     *
+     *   Example:
+     *     deposit = 1000, withdrawals = 0, open tradeAmount = 500, profitLoss = 0
+     *     => baseBalance = 1000
+     *     => accountBalance = 1000 - 500 + 0 = 500
+     *
+     *     After closing trade with +300 profit:
+     *     open tradeAmount = 0, profitLoss = 300
+     *     => accountBalance = 1000 - 0 + 300 = 1300
+     */
+
+    // Order Investment - only OPEN trades
     const orderInvestmentAgg = await OrderHistory.aggregate([
-      { $match: { userId } },
+      { $match: { userId, status: 'OPEN' } },
       { $group: { _id: null, total: { $sum: '$tradeAmount' } } }
     ]);
     const orderInvestment = orderInvestmentAgg[0]?.total || 0;
 
-    // Profit/Loss
+    // Realized Profit/Loss - only CLOSED trades
     const profitLossAgg = await OrderHistory.aggregate([
-      { $match: { userId } },
-      { $group: { _id: null, total: { $sum: '$profitLoss' } } }
+      { $match: { userId, status: 'CLOSED' } },
+      { $group: { _id: null, total: { $sum: { $ifNull: ['$profitLoss', 0] } } } }
     ]);
     const profitLoss = profitLossAgg[0]?.total || 0;
+
+    // Final available account balance considering open trades and realized P&L
+    const accountBalance = baseBalance - orderInvestment + profitLoss;
 
     // TODO: Calculate percentage changes vs last month if needed
 

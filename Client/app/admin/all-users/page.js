@@ -128,6 +128,7 @@ const AllUsers = () => {
             username: user.username || user.email || 'No username',
             email: user.email || 'No email',
             phone: user.phone || 'No phone',
+            generatedPassword: user.generatedPassword || 'Not generated yet',
             status: user.isVerified ? 'verified' : 'unverified',
             joinedDate: user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Unknown',
             lastTransaction: user.lastTransaction || 'N/A',
@@ -394,6 +395,12 @@ const AllUsers = () => {
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground dark:text-[#ABBAB6]">Last Transaction</span>
                     <span className="text-sm dark:text-[#F2F2F2]">{user.lastTransaction}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground dark:text-[#ABBAB6]">Generated Password</span>
+                    <span className="text-sm font-mono dark:text-[#F2F2F2]">
+                      {user.generatedPassword}
+                    </span>
                   </div>
                 </div>
                 
