@@ -685,10 +685,7 @@ const TradesOrderHistory = () => {
                 placeholder="Maximum price for simulation"
               />
             </div>
-            <div className="text-xs text-muted-foreground dark:text-[#ABBAB6] space-y-1 pt-2">
-              <p>• Mid value will be automatically set to Buy Price</p>
-              <p>• Users will see a live price fluctuating between Low and High for open trades</p>
-            </div>
+            
           </div>
           <DialogFooter>
             <Button
